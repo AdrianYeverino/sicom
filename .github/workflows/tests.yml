@@ -1,0 +1,57 @@
+name: tests
+
+# On every push, to any branch, to find out early. And on every pull
+# request, which tests the result already merged with the target branch.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:18
+        env:
+          POSTGRES_DB: sicom
+          POSTGRES_USER: sicom
+          POSTGRES_PASSWORD: dev
+        options: >-
+          --health-cmd "pg_isready -U sicom"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ["5432:5432"]
+
+    env:
+      DEBUG: 0
+      ALLOWED_HOSTS: localhost
+      DATABASE_URL: postgres://sicom:dev@localhost:5432/sicom
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # A long key, different on every run. A short fixed one would fail
+      # check --deploy, which demands the same strength as production.
+      - name: Generate SECRET_KEY
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check the production settings
+        run: python manage.py check --deploy --fail-level WARNING
+
+      # A model change without its migration passes the tests and breaks
+      # in production. This stops it first.
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run the tests
+        run: python manage.py test

@@ -1,0 +1,56 @@
+# Development environment. Not used to deploy: on the server the Dockerfile
+# rules, and Railway builds it on its own.
+#
+#   docker compose up -d db     only the database, with Django on your machine
+#   docker compose up           everything inside, no Python needed locally
+#
+# The passwords here are for development and visible on purpose: this
+# database lives on your machine and holds no real data.
+
+name: sicom
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: sicom
+      POSTGRES_USER: sicom
+      POSTGRES_PASSWORD: dev
+    # Port 5433, so it can run next to the store system's database on 5432.
+    # Only on 127.0.0.1: with the password in plain sight, nobody on the
+    # network should reach it.
+    ports: ["127.0.0.1:5433:5432"]
+    # Since 18 the image keeps its data in /var/lib/postgresql/18/docker.
+    # With the old path (.../data) it would fall outside the volume and be lost.
+    volumes: ["pgdata:/var/lib/postgresql"]
+    healthcheck:
+      # Over TCP and not the socket: on first start the image runs a temporary
+      # Postgres that only listens on the socket. Without -h the check would
+      # pass and web would try to migrate before port 5432 exists.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U sicom -d sicom"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    # Overrides the Dockerfile's CMD: here we want auto-reload and readable
+    # errors, not gunicorn. exec makes runserver the main process so it gets
+    # the shutdown signal; otherwise sh ignores it and Docker kills it after 10 s.
+    command: sh -c "python manage.py migrate --noinput && exec python manage.py runserver 0.0.0.0:8000"
+    environment:
+      SECRET_KEY: development-key-useless-on-the-server
+      DEBUG: 1
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      # Inside compose's network the database is called db, not localhost.
+      DATABASE_URL: postgres://sicom:dev@db:5432/sicom
+      # Taken from your .env if it exists; reading sheets needs it, nothing else does.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [".:/app"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

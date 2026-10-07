@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proveedor", "tipo_documento", "folio", "fecha", "subtotal", "total", "renglones"],
+  "properties": {
+    "proveedor": { "type": ["string", "null"], "description": "Nombre del proveedor que emite la hoja" },
+    "tipo_documento": { "type": ["string", "null"], "description": "Factura, Remision, Nota u otro, tal como lo diga la hoja" },
+    "folio": { "type": ["string", "null"], "description": "Numero de folio o de remision" },
+    "fecha": { "type": ["string", "null"], "description": "Fecha de la hoja en formato AAAA-MM-DD" },
+    "subtotal": { "type": ["number", "null"], "description": "Subtotal impreso antes de impuestos, o null si no aparece" },
+    "total": { "type": ["number", "null"], "description": "Total impreso, o null si no aparece" },
+    "renglones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cantidad", "unidad", "clave", "descripcion", "costo_unitario", "importe", "confianza"],
+        "properties": {
+          "cantidad": { "type": "number" },
+          "unidad": { "type": ["string", "null"], "description": "Unidad tal como esta impresa, o null si la hoja no trae columna de unidad" },
+          "clave": { "type": ["string", "null"], "description": "Clave del producto asignada por el proveedor, o null si no hay" },
+          "descripcion": { "type": "string", "description": "Descripcion impresa del producto, copiada tal cual" },
+          "costo_unitario": { "type": "number" },
+          "importe": { "type": "number" },
+          "confianza": { "type": "number", "minimum": 0, "maximum": 1, "description": "Que tan segura fue la lectura de este renglon, de 0 a 1" }
+        }
+      }
+    }
+  }
+}
