@@ -99,6 +99,11 @@ def add_page(document, user, data, filename="", device=""):
         raise ReceivingError("Este documento ya no acepta páginas.")
     prepared = images.prepare(data)  # raises images.ImageError
     with transaction.atomic():
+        # Photos upload in parallel: lock the document so two pages never
+        # take the same number.
+        document = ReceivedDocument.objects.select_for_update().get(pk=document.pk)
+        if document.status != DocumentStatus.READING:
+            raise ReceivingError("Este documento ya no acepta páginas.")
         order = (document.pages.order_by("-upload_order").values_list("upload_order", flat=True).first() or 0) + 1
         page = DocumentPage.objects.create(
             document=document,
