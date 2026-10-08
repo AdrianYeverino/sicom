@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 
 from catalog.models import Product, Supplier
 
-from . import images, measurements, pricing, services
+from . import costs, images, measurements, pricing, services
 from .matching import Catalog
 from .models import (
     ConfirmedEntry,
@@ -29,6 +29,7 @@ from .models import (
     DocumentWarning,
     EntryLine,
     LineStatus,
+    PageReading,
     ProvisionalLine,
     ReceivedDocument,
 )
@@ -213,6 +214,7 @@ def review(request, pk):
         "amounts": sum((line.amount for line in lines), Decimal("0")),
         "suppliers": Supplier.objects.filter(active=True),
         "entry": ConfirmedEntry.objects.filter(document=document).first(),
+        "reading_cost": costs.of_document(document),
     })
 
 
@@ -403,8 +405,13 @@ def entries(request):
     totals = {e.pk: Decimal("0") for e in found}
     for line in EntryLine.objects.filter(entry__in=found).only("entry_id", "quantity", "unit_cost"):
         totals[line.entry_id] += line.quantity * line.unit_cost
+    reading = costs.by_document(e.document_id for e in found)
+    rows = [(e, totals[e.pk], reading.get(e.document_id, costs.Cost())) for e in found]
     return render(request, "receiving/entries.html", {
-        "rows": [(e, totals[e.pk]) for e in found],
+        "rows": rows,
+        "reading_total": sum((c.usd for _, _, c in rows), Decimal("0")),
+        "reading_total_mxn": costs.to_mxn(sum((c.usd for _, _, c in rows), Decimal("0"))),
+        "rate": settings.USD_MXN_RATE,
         "suppliers": Supplier.objects.all(),
         "filters": request.GET,
         "query": request.GET.urlencode(),
@@ -417,8 +424,16 @@ def entry(request, entry_pk):
     if request.GET.get("format") == "csv":
         return _csv(lines, f"entrada-{found.folio or found.pk}.csv")
     lines = list(lines)
+    readings = list(
+        PageReading.objects.filter(page__document=found.document).select_related("page").order_by("page__upload_order", "created_at")
+    )
+    for r in readings:
+        r.mxn = costs.to_mxn(r.cost_usd) if not r.from_cache else None
     return render(request, "receiving/entry.html", {
         "entry": found,
+        "readings": readings,
+        "reading_cost": costs.of_document(found.document),
+        "rate": settings.USD_MXN_RATE,
         "lines": lines,
         "subtotal": sum((line.subtotal for line in lines), Decimal("0")),
         "not_arrived": found.document.lines.filter(status=LineStatus.DISCARDED),
@@ -428,4 +443,11 @@ def entry(request, entry_pk):
 @staff_member_required
 def metrics(request):
     """The project's goals on confirmed documents. For the administrator."""
-    return render(request, "receiving/metrics.html", {"m": measurements.measure()})
+    documents = list(ReceivedDocument.objects.select_related("supplier").order_by("-created_at")[:50])
+    per_document = costs.by_document(d.pk for d in documents)
+    return render(request, "receiving/metrics.html", {
+        "m": measurements.measure(),
+        "cost": costs.total(),
+        "documents": [(d, per_document.get(d.pk, costs.Cost())) for d in documents],
+        "rate": settings.USD_MXN_RATE,
+    })

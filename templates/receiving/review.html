@@ -21,6 +21,7 @@
           <p class="muted">{{ document.document_type_read|default:"Documento" }} {{ document.folio_read }}
             {% if document.document_date_read %}· {{ document.document_date_read|date:"d M Y" }}{% endif %}
             · subido por {{ document.created_by.get_username }}</p>
+          <p class="small muted">Lectura: {{ reading_cost.input_tokens|floatformat:"0g" }} + {{ reading_cost.output_tokens|floatformat:"0g" }} tokens · ${{ reading_cost.mxn|floatformat:2 }} MXN ({{ reading_cost.usd|floatformat:4 }} USD){% if reading_cost.failed %} · {{ reading_cost.failed }} intentos fallidos{% endif %}</p>
         </div>
         <span class="status status-{{ document.status }}">{{ document.get_status_display }}</span>
       </div>

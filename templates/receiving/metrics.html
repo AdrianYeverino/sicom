@@ -20,10 +20,34 @@
 </table>
 
 <h2 class="section-title">Costo de la lectura</h2>
+<p class="small muted">Todas las llamadas al modelo, incluidos los intentos fallidos. Pesos al tipo de cambio configurado: ${{ rate }} por dólar.</p>
 <dl class="totals">
-  <div><dt>Lecturas pagadas</dt><dd class="num">{{ m.readings_paid }}</dd></div>
-  <div><dt>Gastado</dt><dd class="num">${{ m.spent_usd|floatformat:4 }} USD</dd></div>
-  <div><dt>Por página</dt><dd class="num">${{ m.cost_per_page|floatformat:5 }} USD</dd></div>
-  <div><dt>Tokens de entrada por página</dt><dd class="num">{{ m.tokens_per_page|floatformat:0 }}</dd></div>
+  <div><dt>Llamadas al modelo</dt><dd class="num">{{ cost.calls }}{% if cost.failed %} <span class="small bad-text">({{ cost.failed }} fallidas)</span>{% endif %}</dd></div>
+  <div><dt>Tokens de entrada</dt><dd class="num">{{ cost.input_tokens|floatformat:"0g" }}</dd></div>
+  <div><dt>Tokens de salida</dt><dd class="num">{{ cost.output_tokens|floatformat:"0g" }}</dd></div>
+  <div><dt>Costo total</dt><dd class="num">${{ cost.usd|floatformat:4 }} USD<br><span class="small">${{ cost.mxn|floatformat:2 }} MXN</span></dd></div>
+  <div><dt>Promedio por página leída</dt><dd class="num">${{ m.cost_per_page|floatformat:5 }} USD<br><span class="small">{{ m.tokens_per_page|floatformat:0 }} tokens de entrada</span></dd></div>
 </dl>
+
+<h2 class="section-title">Por documento</h2>
+{% if documents %}
+<table class="table">
+  <thead><tr><th>Documento</th><th class="num hide-narrow">Llamadas</th><th class="num hide-narrow">Tokens</th><th class="num">USD</th><th class="num">MXN</th></tr></thead>
+  <tbody>
+  {% for d, c in documents %}
+    <tr>
+      <td><a href="{% url 'receiving:review' d.pk %}">{{ d.supplier.name|default:d.supplier_name_read|default:"Documento" }}</a>
+        <span class="muted small">· {{ d.folio_read|default:"sin folio" }} · {{ d.created_at|date:"d M" }} · {{ d.get_status_display }}</span></td>
+      <td class="num hide-narrow">{{ c.calls }}{% if c.failed %} <span class="bad-text small">({{ c.failed }} ✗)</span>{% endif %}</td>
+      <td class="num hide-narrow">{{ c.input_tokens|floatformat:"0g" }} + {{ c.output_tokens|floatformat:"0g" }}</td>
+      <td class="num">${{ c.usd|floatformat:4 }}</td>
+      <td class="num">${{ c.mxn|floatformat:2 }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="small muted">Tokens: entrada + salida. Los últimos 50 documentos, en cualquier estado.</p>
+{% else %}
+<div class="empty"><p>Todavía no se ha leído ningún documento.</p></div>
+{% endif %}
 {% endblock %}

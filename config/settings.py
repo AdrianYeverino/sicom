@@ -178,6 +178,10 @@ STORE_NAME = config("STORE_NAME", default="SICOM")
 # Prices on supplier sheets come before tax; the store sells with tax included.
 TAX_RATE = config("TAX_RATE", default="0.16", cast=Decimal)
 
+# Pesos per dollar, to show what each reading cost in pesos. Set the current
+# rate on the server; screens say which rate they used.
+USD_MXN_RATE = config("USD_MXN_RATE", default="19.50", cast=Decimal)
+
 # Only for products that never had a margin of their own.
 DEFAULT_MARGIN_PERCENT = config("DEFAULT_MARGIN_PERCENT", default="55", cast=Decimal)
 

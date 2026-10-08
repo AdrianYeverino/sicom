@@ -30,5 +30,29 @@
 <h2 class="section-title">No llegaron</h2>
 <ul class="plain">{% for l in not_arrived %}<li>{{ l.description }} <span class="muted small">· facturado {{ l.quantity|floatformat:"-3" }}</span></li>{% endfor %}</ul>
 {% endif %}
+<h2 class="section-title">Costo de la lectura</h2>
+<dl class="totals">
+  <div><dt>Llamadas al modelo</dt><dd class="num">{{ reading_cost.calls }}{% if reading_cost.failed %} <span class="small bad-text">({{ reading_cost.failed }} fallidas)</span>{% endif %}</dd></div>
+  <div><dt>Tokens</dt><dd class="num">{{ reading_cost.input_tokens|floatformat:"0g" }} + {{ reading_cost.output_tokens|floatformat:"0g" }}</dd></div>
+  <div><dt>Costo</dt><dd class="num">${{ reading_cost.mxn|floatformat:2 }} MXN<br><span class="small">{{ reading_cost.usd|floatformat:4 }} USD</span></dd></div>
+</dl>
+{% if readings %}
+<details class="line-block">
+  <summary>Detalle por página</summary>
+  <table class="mini">
+    <thead><tr><th>Pág.</th><th>Resultado</th><th class="num">Tokens</th><th class="num">USD</th><th class="num">MXN</th><th class="num hide-narrow">Seg.</th></tr></thead>
+    <tbody>{% for r in readings %}
+      <tr><td>{{ r.page.upload_order }}</td>
+        <td>{{ r.get_outcome_display }}{% if r.from_cache %} <span class="muted">(guardada)</span>{% endif %}</td>
+        <td class="num">{{ r.input_tokens|default_if_none:"—" }} + {{ r.output_tokens|default_if_none:"—" }}</td>
+        <td class="num">{% if r.from_cache %}—{% else %}{{ r.cost_usd|default_if_none:"—" }}{% endif %}</td>
+        <td class="num">{% if r.mxn is not None %}{{ r.mxn|floatformat:4 }}{% else %}—{% endif %}</td>
+        <td class="num hide-narrow">{{ r.seconds|default_if_none:"—" }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  <p class="small muted">Modelo {{ readings.0.model }}{% if readings.0.provider %} vía {{ readings.0.provider }}{% endif %}. Pesos a ${{ rate }} por dólar.</p>
+</details>
+{% endif %}
+
 <p><a href="{% url 'receiving:review' entry.document.pk %}">Ver el documento y sus fotos</a></p>
 {% endblock %}
