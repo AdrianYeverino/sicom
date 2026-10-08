@@ -125,17 +125,20 @@ def parse_json(text: str):
 
 
 def to_content(data: dict) -> PageContent:
-    """The validated Spanish answer, with English names and exact decimals."""
+    """The validated Spanish answer, with English names and exact decimals.
+
+    Saved answers from earlier prompt versions lack the keys added later
+    (descuento in v3), so those are read as absent instead of required."""
     return PageContent(
-        page_number=data["pagina"],
-        page_count=data["paginas_totales"],
+        page_number=data.get("pagina"),
+        page_count=data.get("paginas_totales"),
         supplier_name=_text(data["proveedor"]),
-        supplier_rfc=_text(data["rfc_proveedor"]).upper().replace(" ", "").replace("-", ""),
+        supplier_rfc=_text(data.get("rfc_proveedor")).upper().replace(" ", "").replace("-", ""),
         document_type=_text(data["tipo_documento"]),
         folio=_text(data["folio"]),
         date=data["fecha"],
         subtotal=_decimal(data["subtotal"]),
-        tax=_decimal(data["iva"]),
+        tax=_decimal(data.get("iva")),
         total=_decimal(data["total"]),
         lines=[
             ReadLine(
@@ -145,9 +148,9 @@ def to_content(data: dict) -> PageContent:
                 description=_text(r["descripcion"]),
                 unit_cost=_decimal(r["costo_unitario"]),
                 amount=_decimal(r["importe"]),
-                handwritten_price=_decimal(r["precio_escrito"]),
+                handwritten_price=_decimal(r.get("precio_escrito")),
                 confidence=_decimal(r["confianza"]),
-                discount_percent=_decimal(r["descuento"]) or None,
+                discount_percent=_decimal(r.get("descuento")) or None,
             )
             for r in data["renglones"]
         ],

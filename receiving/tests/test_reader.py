@@ -163,3 +163,16 @@ class SavedReadingTest(SimpleTestCase):
                 reader.read_page(b"photo")
                 reader.read_page(b"photo")
         self.assertEqual(client.chat.completions.create.call_count, 2)
+
+
+class OlderReadingsTest(SimpleTestCase):
+    """Readings saved with an earlier prompt are still read: metrics and
+    finishing a document use the stored answers, not new calls."""
+
+    def test_a_v2_answer_without_discount(self):
+        v2 = json.loads(json.dumps(PAGE))
+        for line in v2["renglones"]:
+            del line["descuento"]
+        content = reader.to_content(v2)
+        self.assertIsNone(content.lines[0].discount_percent)
+        self.assertEqual(content.lines[0].unit_cost, Decimal("40.5"))
