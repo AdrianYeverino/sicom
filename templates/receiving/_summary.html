@@ -1,0 +1,12 @@
+<div class="action-bar" id="summary" hx-get="{% url 'receiving:summary' document.pk %}" hx-trigger="lineChanged from:body" hx-swap="outerHTML">
+  <div class="summary">
+    <span class="summary-total num">${{ received_total|floatformat:"2g" }}</span>
+    <span class="small muted">{{ line_count }} renglones{% if not_arrived %} · {{ not_arrived }} no llegaron{% endif %}{% if flagged %} · <b class="warn-text">{{ flagged }} por revisar</b>{% endif %}</span>
+  </div>
+  {% if document.status == 'in_review' %}
+  <form method="post" action="{% url 'receiving:confirm' document.pk %}">{% csrf_token %}
+    <button class="btn btn-primary btn-big" type="submit" {% if blockers %}disabled title="{{ blockers|join:' ' }}"{% endif %}>Confirmar entrada</button>
+  </form>
+  {% endif %}
+  {% if blockers %}<p class="blockers small">{{ blockers|join:" " }}</p>{% endif %}
+</div>

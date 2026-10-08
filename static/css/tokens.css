@@ -1,0 +1,130 @@
+/* tokens.css — design tokens
+   Lo único que hay que tocar para cambiar colores, tamaños y ritmo.
+   Ningún otro archivo escribe un color literal.
+
+   Criterio de la paleta: el neutro es NEUTRO, no verde-grisáceo. El tinte
+   verde repartido por todas las superficies es lo que hacía que la v1 se
+   viera lavada y genérica. El verde aparece solo donde significa algo. */
+
+:root {
+  /* ---- Superficies: neutro, apenas cálido -------------------------------- */
+  --bg:            #F6F6F4;
+  --surface:       #FFFFFF;
+  --surface-2:     #FAFAF8;
+  --surface-3:     #EFEFEB;
+  --border:        #E3E3DE;
+  --border-strong: #C8C8C1;
+
+  /* ---- Texto: negro de verdad, no gris azulado ------------------------- */
+  --text:   #111110;
+  --text-2: #52524B;
+  --text-3: #78786F;
+
+  /* ---- Marca: verde nítido y saturado ----------------------------------
+     El #14432A del logo es casi negro y como botón se veía severo. Este es
+     el mismo verde, abierto y con saturación de verdad. Sin difuminados. */
+  --brand:       #0E7A43;
+  --brand-hover: #0A6236;
+  --brand-soft:  #E1F3E8;
+  --brand-line:  #9FD6B6;
+  --brand-text:  #0A5731;
+  --on-brand:    #FFFFFF;
+
+  /* ---- Atención: el naranja del logo, un solo trabajo ------------------- */
+  --warn:      #E2611F;
+  --warn-soft: #FDEBE0;
+  --warn-line: #F3B58F;
+  --warn-text: #97390A;
+
+  /* ---- Correcto: verde distinto al de marca ----------------------------
+     Si "cuadró" usa el color del botón, todo parece pulsable. */
+  --ok:      #15803D;
+  --ok-soft: #E4F4EA;
+  --ok-text: #0D5B2B;
+
+  /* ---- Error ------------------------------------------------------------ */
+  --bad:      #B42318;
+  --bad-soft: #FCEAE7;
+  --bad-text: #8C1D13;
+
+  /* ---- Tipografía ------------------------------------------------------- */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+          "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+
+  /* Celular: 15px de base. La densidad de 13.5 era de escritorio. */
+  --t-xs: 12px;
+  --t-sm: 13.5px;
+  --t-md: 15px;
+  --t-lg: 17px;
+  --t-xl: 20px;
+  --t-2xl: 25px;
+  --t-3xl: 32px;
+
+  /* ---- Ritmo ------------------------------------------------------------ */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px;
+  --s-4: 16px; --s-5: 24px; --s-6: 32px;
+
+  /* ---- Forma ------------------------------------------------------------ */
+  --r-sm: 6px; --r-md: 9px; --r-lg: 13px;
+
+  /* ---- Alturas: 44px es el mínimo tocable ------------------------------- */
+  --h-control: 46px;
+  --h-primary: 54px;
+  --h-nav:     58px;
+
+  /* ---- Sombra: solo lo que flota, con desplazamiento real --------------- */
+  --shadow: 0 8px 28px -8px rgba(17, 17, 16, .20), 0 2px 6px -2px rgba(17, 17, 16, .10);
+
+  --ease: cubic-bezier(.23, 1, .32, 1);
+  color-scheme: light;
+}
+
+/* Escritorio: vuelve la densidad. Aquí sí se lee de cerca. */
+@media (min-width: 901px) {
+  :root {
+    --t-md: 14px; --t-lg: 16px;
+    --h-control: 38px; --h-primary: 44px;
+  }
+}
+
+/* =======================================================================
+   TEMA OSCURO — negro de verdad, no gris con tinte verde.
+   El verde tiene que brillar contra el negro; si el fondo también es
+   verdoso, el acento deja de acentuar.
+   ======================================================================= */
+:root[data-theme="dark"] {
+  --bg:            #0A0A0A;
+  --surface:       #141414;
+  --surface-2:     #1A1A1A;
+  --surface-3:     #232323;
+  --border:        #2A2A2A;
+  --border-strong: #3D3D3D;
+
+  --text:   #F4F4F2;
+  --text-2: #A6A6A0;
+  --text-3: #7A7A74;
+
+  --brand:       #22B563;
+  --brand-hover: #2ECC72;
+  --brand-soft:  #0E2A1A;
+  --brand-line:  #1E5E3A;
+  --brand-text:  #4FD98C;
+  --on-brand:    #05150C;
+
+  --warn:      #F07030;
+  --warn-soft: #2E1A0C;
+  --warn-line: #6B3814;
+  --warn-text: #F9A46E;
+
+  --ok:      #22B563;
+  --ok-soft: #0E2A1A;
+  --ok-text: #4FD98C;
+
+  --bad:      #E5484D;
+  --bad-soft: #2C1214;
+  --bad-text: #F08A8D;
+
+  --shadow: 0 8px 28px -8px rgba(0, 0, 0, .7), 0 2px 6px -2px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}

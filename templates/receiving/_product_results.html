@@ -1,0 +1,17 @@
+{% if products %}
+<ul class="results">
+  {% for p in products %}
+  <li>
+    <form hx-post="{% url 'receiving:line_link' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+      <input type="hidden" name="product" value="{{ p.pk }}">
+      <button class="result" type="submit">
+        <span>{{ p.name }}</span>
+        <span class="muted small num">{% if p.last_cost %}${{ p.last_cost|floatformat:"2g" }}{% endif %}{% if p.retail_price %} · venta ${{ p.retail_price|floatformat:"2g" }}{% endif %}</span>
+      </button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% elif q %}
+<p class="small muted">Nada con «{{ q }}». Dalo de alta abajo.</p>
+{% endif %}

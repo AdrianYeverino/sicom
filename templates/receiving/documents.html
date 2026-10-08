@@ -1,8 +1,42 @@
-<!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ store_name }}</title></head>
-<body>
-<h1>{{ store_name }}</h1>
-<ul>{% for d in documents %}<li>{{ d }} · {{ d.get_status_display }}</li>{% empty %}<li>Sin documentos.</li>{% endfor %}</ul>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Documentos · {% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Documentos</h1>
+  <form method="post" action="{% url 'receiving:document_new' %}">{% csrf_token %}
+    <button class="btn btn-primary" type="submit">+ Recibir mercancía</button>
+  </form>
+</div>
+
+<nav class="chips" aria-label="Filtrar por estado">
+  <a class="chip {% if not status %}is-on{% endif %}" href="?">Todos</a>
+  {% for value, label in statuses %}
+  <a class="chip {% if status == value %}is-on{% endif %}" href="?status={{ value }}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% if documents %}
+<ul class="doc-list">
+  {% for d in documents %}
+  <li>
+    <a class="doc-row" href="{% if d.status == 'reading' %}{% url 'receiving:upload' d.pk %}{% else %}{% url 'receiving:review' d.pk %}{% endif %}">
+      <span class="doc-main">
+        <strong>{{ d.supplier.name|default:d.supplier_name_read|default:"Sin proveedor todavía" }}</strong>
+        <span class="muted">{{ d.document_type_read|default:"Documento" }} {{ d.folio_read }} · {{ d.page_count }} pág. · {{ d.line_count }} renglones</span>
+      </span>
+      <span class="doc-side">
+        <span class="status status-{{ d.status }}">{{ d.get_status_display }}</span>
+        {% if d.status == 'in_review' and d.flagged %}<span class="pill-warn">{{ d.flagged }} por revisar</span>{% endif %}
+        <span class="muted num">{{ d.created_at|date:"d M H:i" }} · {{ d.created_by.get_username }}</span>
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty">
+  <p><strong>Aquí aparecen las hojas de proveedor que se reciban.</strong></p>
+  <p class="muted">Toca <em>Recibir mercancía</em>, toma una foto de cada página de la hoja y el sistema leerá sus renglones para revisarlos mientras cuentas.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,16 @@
-<!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Entrar · {{ store_name }}</title></head>
-<body>
-<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Entrar</button></form>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Entrar · {% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<section class="login">
+  <h1>{{ store_name }}</h1>
+  <p class="muted">Recepción de mercancía</p>
+  <form method="post" class="stack">{% csrf_token %}
+    {% if form.errors %}<p class="msg msg-error">Usuario o contraseña incorrectos.</p>{% endif %}
+    <label>Usuario<input name="username" autocomplete="username" autocapitalize="none" required value="{{ form.username.value|default:'' }}"></label>
+    <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+  </form>
+</section>
+{% endblock %}

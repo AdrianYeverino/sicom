@@ -1,0 +1,19 @@
+<li class="page-card" id="page-{{ page.pk }}" data-status="{{ page.read_status }}">
+  <a href="{% url 'receiving:thumbnail' page.pk %}" target="_blank" class="page-thumb">
+    <img src="{% url 'receiving:thumbnail' page.pk %}" alt="Página {{ page.upload_order }}" loading="lazy" width="72" height="96">
+  </a>
+  <div class="page-info">
+    <strong>Página {{ page.upload_order }}{% if page.printed_page %} · impresa {{ page.printed_page }}{% endif %}</strong>
+    <span class="muted small">{{ page.original_filename|default:"foto" }}</span>
+    {% if page.read_status == 'read' %}
+      <span class="ok-text">✓ Leída{% if last.raw.renglones %} · {{ last.raw.renglones|length }} renglones{% endif %}</span>
+    {% elif page.read_status == 'failed' %}
+      <span class="bad-text">✗ {{ last.get_outcome_display|default:"No se pudo leer" }}</span>
+      <label class="btn btn-small">
+        <input type="file" accept="image/*,.heic,.heif" hidden data-replace="{% url 'receiving:page_replace' page.pk %}">
+        Volver a subir esta foto
+      </label>
+    {% endif %}
+    {% if error %}<span class="bad-text">{{ error }}</span>{% endif %}
+  </div>
+</li>

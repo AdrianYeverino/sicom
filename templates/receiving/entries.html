@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Entradas · {% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Entradas confirmadas</h1>
+  <a class="btn" href="?{{ query }}{% if query %}&{% endif %}format=csv">Descargar CSV</a>
+</div>
+
+<form method="get" class="filters">
+  <label>Proveedor
+    <select name="supplier">
+      <option value="">Todos</option>
+      {% for s in suppliers %}<option value="{{ s.pk }}" {% if filters.supplier == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="short">Desde<input type="date" name="from" value="{{ filters.from }}"></label>
+  <label class="short">Hasta<input type="date" name="to" value="{{ filters.to }}"></label>
+  <button class="btn btn-small" type="submit">Filtrar</button>
+</form>
+
+{% if rows %}
+<table class="table">
+  <thead><tr><th>Fecha</th><th>Proveedor</th><th class="hide-narrow">Folio</th><th class="num">Subtotal</th><th class="hide-narrow">Confirmó</th></tr></thead>
+  <tbody>
+  {% for e, total in rows %}
+    <tr>
+      <td><a href="{% url 'receiving:entry' e.pk %}">{{ e.entry_date|date:"d M Y" }}</a></td>
+      <td><a href="{% url 'receiving:entry' e.pk %}">{{ e.supplier.name }}</a> <span class="muted small">· {{ e.line_count }}</span></td>
+      <td class="hide-narrow">{{ e.folio|default:"—" }}</td>
+      <td class="num">${{ total|floatformat:"2g" }}</td>
+      <td class="hide-narrow">{{ e.confirmed_by.get_username }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty"><p>Todavía no hay entradas confirmadas{% if filters %} con estos filtros{% endif %}.</p>
+  <p class="muted">Una entrada se crea al confirmar un documento revisado.</p></div>
+{% endif %}
+{% endblock %}

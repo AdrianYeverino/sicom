@@ -52,6 +52,14 @@ def _thresholds():
     return {name: str(value) for name, value in settings.THRESHOLDS.items()}
 
 
+def thresholds_of(document):
+    """The values this document is checked with: the ones stored on it,
+    completed with the current settings for any that are missing."""
+    values = dict(settings.THRESHOLDS)
+    values.update({name: Decimal(value) for name, value in (document.thresholds or {}).items()})
+    return values
+
+
 def _record(page, result, image_side):
     return PageReading.objects.create(
         page=page,
@@ -139,7 +147,7 @@ def finish_reading(document, user):
 
     contents = [(page.pk, reader.to_content(latest_reading(page).raw)) for page in pages]
     merged = merge(contents)
-    thresholds = {k: Decimal(v) for k, v in document.thresholds.items()} or settings.THRESHOLDS
+    thresholds = thresholds_of(document)
     by_id = {p.pk: p for p in pages}
 
     with transaction.atomic(), changes_by(user, Source.READER):
@@ -224,9 +232,8 @@ def correct_line(line, user, **values):
         if changed:
             line.corrected_by_person = True
         if line.quantity is not None:
-            line.amount_matches = abs(line.quantity * line.unit_cost - line.amount) <= Decimal(
-                line.document.thresholds.get("amount_tolerance", "0.01")
-            )
+            tolerance = thresholds_of(line.document)["amount_tolerance"]
+            line.amount_matches = abs(line.quantity * line.unit_cost - line.amount) <= tolerance
         else:
             line.amount_matches = None
         _settle(line)

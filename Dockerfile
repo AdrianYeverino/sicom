@@ -31,4 +31,4 @@ USER app
 # that admin account (skipped if it exists); remove the password afterwards.
 # exec makes gunicorn the main process, so it gets the shutdown signal and
 # finishes requests in flight. The long timeout leaves room for reading a page.
-CMD ["sh", "-c", "if [ \"${MIGRATE_ON_START:-0}\" = 1 ]; then python manage.py migrate --noinput || exit 1; fi; if [ -n \"${DJANGO_SUPERUSER_PASSWORD:-}\" ]; then python manage.py createsuperuser --noinput || true; fi; exec gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --access-logfile -"]
+CMD ["sh", "-c", "if [ \"${MIGRATE_ON_START:-0}\" = 1 ]; then python manage.py migrate --noinput || exit 1; fi; if [ -n \"${DJANGO_SUPERUSER_PASSWORD:-}\" ]; then python manage.py createsuperuser --noinput || true; fi; exec gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --threads 4 --timeout 120 --access-logfile -"]

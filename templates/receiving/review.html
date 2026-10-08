@@ -1,0 +1,79 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Revisar · {% endblock %}
+{% block head %}<script src="{% static 'js/review.js' %}"></script>{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<div class="review">
+  <aside class="review-pages" aria-label="Páginas">
+    {% for page in pages %}
+    <a href="{% url 'receiving:thumbnail' page.pk %}" target="_blank" class="review-thumb">
+      <img src="{% url 'receiving:thumbnail' page.pk %}" alt="Página {{ page.upload_order }}" loading="lazy">
+      <span class="small muted">Página {{ page.upload_order }}</span>
+    </a>
+    {% endfor %}
+  </aside>
+
+  <div class="review-main">
+    <section class="doc-head">
+      <div class="doc-head-row">
+        <div>
+          <h1>{{ document.supplier.name|default:document.supplier_name_read|default:"Proveedor sin identificar" }}</h1>
+          <p class="muted">{{ document.document_type_read|default:"Documento" }} {{ document.folio_read }}
+            {% if document.document_date_read %}· {{ document.document_date_read|date:"d M Y" }}{% endif %}
+            · subido por {{ document.created_by.get_username }}</p>
+        </div>
+        <span class="status status-{{ document.status }}">{{ document.get_status_display }}</span>
+      </div>
+
+      <dl class="totals">
+        <div><dt>Suma de importes</dt><dd class="num">${{ amounts|floatformat:"2g" }}</dd></div>
+        {% if document.subtotal_read is not None %}<div><dt>Subtotal impreso</dt><dd class="num">${{ document.subtotal_read|floatformat:"2g" }}</dd></div>{% endif %}
+        {% if document.tax_read is not None %}<div><dt>IVA</dt><dd class="num">${{ document.tax_read|floatformat:"2g" }}</dd></div>{% endif %}
+        {% if document.total_read is not None %}<div><dt>Total impreso</dt><dd class="num">${{ document.total_read|floatformat:"2g" }}</dd></div>{% endif %}
+      </dl>
+
+      {% if warnings %}
+      <ul class="warnings" role="status">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      {% if document.status == 'in_review' %}
+      <details class="supplier-pick" {% if not document.supplier %}open{% endif %}>
+        <summary>{% if document.supplier %}Proveedor: <b>{{ document.supplier.name }}</b>{% if document.supplier.rfc %} · {{ document.supplier.rfc }}{% endif %} · cambiar{% else %}<b class="warn-text">Falta elegir el proveedor</b>{% endif %}</summary>
+        {% if suppliers %}
+        <form method="post" action="{% url 'receiving:supplier' document.pk %}" class="inline">{% csrf_token %}
+          <select name="supplier" required>
+            <option value="">Elegir…</option>
+            {% for s in suppliers %}<option value="{{ s.pk }}" {% if s.pk == document.supplier_id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+          </select>
+          <button class="btn btn-small" type="submit">Usar</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'receiving:supplier' document.pk %}" class="inline">{% csrf_token %}
+          <label>Nuevo<input name="name" value="{{ document.supplier_name_read }}" required maxlength="120"></label>
+          <label class="short">RFC<input name="rfc" value="{{ document.supplier_rfc_read }}" maxlength="13" autocapitalize="characters"></label>
+          <button class="btn btn-small" type="submit">Dar de alta</button>
+        </form>
+      </details>
+      {% elif entry %}
+      <p><a class="btn" href="{% url 'receiving:entry' entry.pk %}">Ver la entrada confirmada</a></p>
+      {% endif %}
+    </section>
+
+    {% if flagged %}<h2 class="section-title">Por revisar <span class="pill-warn">{{ flagged }}</span></h2>{% endif %}
+    <div class="lines">
+      {% for card in cards %}{% with line=card.line %}
+        {% include "receiving/_line.html" with line=card.line error=card.error suggestion=card.suggestion proposed_quantity=card.proposed_quantity received=card.received received_more=card.received_more price_options=card.price_options history=card.history editable=card.editable cost_with_tax=card.cost_with_tax %}
+      {% endwith %}{% empty %}
+        <div class="empty"><p>El modelo no encontró renglones en estas fotos.</p></div>
+      {% endfor %}
+    </div>
+
+    {% if document.status == 'in_review' %}
+    <form method="post" action="{% url 'receiving:discard' document.pk %}" class="discard">{% csrf_token %}
+      <button class="link-btn danger" type="submit" onclick="return confirm('¿Descartar este documento? Queda en el historial y no crea ninguna entrada.')">Descartar el documento completo</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block foot %}{% if document.status != 'discarded' %}{% include "receiving/_summary.html" %}{% endif %}{% endblock %}

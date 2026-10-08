@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Subir hoja · {% endblock %}
+{% block head %}<script src="{% static 'js/upload.js' %}" defer></script>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Fotos de la hoja</h1>
+</div>
+<p class="muted">Una foto por página, en orden. La foto se queda en tu teléfono: aquí solo se guarda una miniatura.</p>
+
+<ol class="pages" id="pages" data-upload-url="{% url 'receiving:page_add' document.pk %}">
+  {% for page, last in pages %}{% include "receiving/_page.html" %}{% endfor %}
+</ol>
+
+<div class="upload-actions">
+  <label class="btn btn-primary btn-big">
+    <input type="file" accept="image/*" capture="environment" data-upload hidden>
+    Tomar foto
+  </label>
+  <label class="btn btn-big">
+    <input type="file" accept="image/*,.heic,.heif" multiple data-upload hidden>
+    Elegir fotos
+  </label>
+</div>
+<p class="drop-hint muted only-desktop">También puedes arrastrar las fotos aquí, incluidas las HEIC del iPhone.</p>
+
+<div class="action-bar">
+  <form method="post" action="{% url 'receiving:discard' document.pk %}" class="action-secondary">{% csrf_token %}
+    <button class="link-btn danger" type="submit" onclick="return confirm('¿Descartar este documento? Queda en el historial.')">Descartar</button>
+  </form>
+  <form method="post" action="{% url 'receiving:finish' document.pk %}">{% csrf_token %}
+    <button class="btn btn-primary btn-big" type="submit" data-finish {% if not pages %}disabled{% endif %}>Listo, revisar renglones</button>
+  </form>
+</div>
+{% endblock %}

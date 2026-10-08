@@ -1,0 +1,151 @@
+{% load l10n %}
+<article class="line-card" id="line-{{ line.pk }}" data-status="{{ line.status }}">
+  <header class="line-head">
+    <span class="line-pos num">{{ line.position }}</span>
+    <div class="line-title">
+      <strong class="line-desc">{{ line.description }}</strong>
+      <span class="muted small">{% if line.supplier_code %}Clave {{ line.supplier_code }} · {% endif %}{% if line.unit %}{{ line.unit }} · {% endif %}pág. {{ line.page.upload_order }}</span>
+    </div>
+    {% if line.status == 'flagged' %}
+      <span class="reason">{{ line.get_reason_display }}</span>
+    {% elif line.status == 'discarded' %}
+      <span class="status status-discarded">No llegó</span>
+    {% elif line.reason == 'cost_variation' %}
+      <span class="reason reason-soft">Costo distinto al anterior</span>
+    {% elif line.status == 'confirmed' %}
+      <span class="status status-confirmed">Confirmado</span>
+    {% else %}
+      <span class="ok-text small">✓ Cuadra</span>
+    {% endif %}
+  </header>
+
+  {% if error %}<p class="msg msg-error" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="figures">
+    <span><span class="label">Cantidad</span>
+      {% if line.quantity is None %}<b class="bad-text">no se ve</b>{% else %}<b class="num">{{ line.quantity|floatformat:"-3" }}</b>{% endif %}</span>
+    <span class="op">×</span>
+    <span><span class="label">Costo</span><b class="num">${{ line.unit_cost|floatformat:"2g" }}</b></span>
+    <span class="op">=</span>
+    <span><span class="label">Importe</span><b class="num {% if line.amount_matches is False %}bad-text{% endif %}">${{ line.amount|floatformat:"2g" }}</b></span>
+  </div>
+  {% if line.handwritten_price %}<p class="small muted">Escrito a mano en la hoja: <b class="num">${{ line.handwritten_price|floatformat:"2g" }}</b></p>{% endif %}
+
+  {% if editable %}
+    {% if line.quantity is None and proposed_quantity %}
+    <form class="inline" hx-post="{% url 'receiving:line_correct' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+      <input type="hidden" name="quantity" value="{{ proposed_quantity|unlocalize }}">
+      <button class="btn btn-small" type="submit">La cuenta da {{ proposed_quantity|floatformat:"-3" }}: usar esa cantidad</button>
+    </form>
+    {% endif %}
+
+    {# Product #}
+    <section class="line-block">
+      {% if line.product %}
+        <p><span class="label">Producto</span> <b>{{ line.product.name }}</b>
+          {% if line.product.last_cost %}<span class="muted small">· último costo ${{ line.product.last_cost|floatformat:"2g" }}</span>{% endif %}</p>
+      {% else %}
+        <p class="label">¿Qué producto es?</p>
+        {% if suggestion %}
+        <form class="inline" hx-post="{% url 'receiving:line_link' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+          <input type="hidden" name="product" value="{{ suggestion.pk }}">
+          <button class="btn btn-small" type="submit">Es «{{ suggestion.name }}»</button>
+        </form>
+        {% endif %}
+      {% endif %}
+      <details class="product-pick" {% if not line.product and not suggestion %}open{% endif %}>
+        <summary>{% if line.product %}Cambiar producto{% else %}Buscar o dar de alta{% endif %}</summary>
+        <input type="search" name="q" placeholder="Buscar por nombre o clave" autocomplete="off"
+               hx-get="{% url 'receiving:product_search' line.pk %}" hx-trigger="input changed delay:300ms, search"
+               hx-target="#results-{{ line.pk }}">
+        <div id="results-{{ line.pk }}"></div>
+        <form class="new-product" hx-post="{% url 'receiving:line_new_product' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+          <label>Producto nuevo<input name="name" value="{{ line.description }}" required maxlength="200"></label>
+          <label class="short">Unidad<input name="unit" value="{{ line.unit }}" maxlength="30"></label>
+          <button class="btn btn-small" type="submit">Dar de alta</button>
+        </form>
+      </details>
+    </section>
+
+    {% if line.status != 'discarded' %}
+    {# Received quantity #}
+    <form class="line-block inline" hx-post="{% url 'receiving:line_received' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+      <label class="short"><span class="label">Llegaron</span>
+        <input name="received" inputmode="decimal" value="{{ received|default_if_none:''|unlocalize }}" autocomplete="off"></label>
+      <button class="btn btn-small" type="submit">Guardar</button>
+      {% if received_more %}<span class="warn-text small">Llegó más de lo facturado</span>{% endif %}
+    </form>
+
+    {# Margin and retail price, tied together #}
+    {% localize off %}
+    <form class="line-block price" hx-post="{% url 'receiving:line_price' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML"
+          x-data="price({{ cost_with_tax }}, {{ line.margin_percent|default_if_none:'null' }}, {{ line.retail_price|default_if_none:'null' }})">
+      <p class="label">Precio público <span class="muted">(costo con IVA ${{ cost_with_tax }})</span></p>
+      <div class="chips">
+        {% for o in price_options %}
+        <button type="button" class="chip" @click="setPrice({{ o.retail_price }})">{{ o.label }}: ${{ o.retail_price }}{% if o.margin_percent is not None %} · {{ o.margin_percent }}%{% endif %}</button>
+        {% endfor %}
+      </div>
+      <div class="price-row">
+        <label class="short"><span class="label">Margen %</span>
+          <input name="margin_percent" inputmode="decimal" x-model="margin" @input="fromMargin()" autocomplete="off"></label>
+        <label class="short"><span class="label">Precio $</span>
+          <input name="retail_price" inputmode="decimal" x-model="price" @input="fromPrice()" autocomplete="off"></label>
+        <input type="hidden" name="by" :value="by">
+      </div>
+      <div class="chips">
+        <button type="button" class="chip" @click="round(1)">Redondear a peso</button>
+        <button type="button" class="chip" @click="round(5)">Al múltiplo de 5</button>
+      </div>
+      <button class="btn btn-small" type="submit" :disabled="!price">Guardar precio</button>
+      {% if line.retail_price is not None %}<span class="ok-text small">Guardado: ${{ line.retail_price }} · {{ line.margin_percent }}%</span>{% endif %}
+    </form>
+    {% endlocalize %}
+    {% endif %}
+
+    {% if history %}
+    <details class="line-block history">
+      <summary>Compras anteriores de este producto</summary>
+      <table class="mini">
+        <thead><tr><th>Fecha</th><th>Proveedor</th><th class="num">Costo</th><th class="num">Precio</th></tr></thead>
+        <tbody>{% for h in history %}
+          <tr><td>{{ h.entry.entry_date|date:"d M y" }}</td><td>{{ h.entry.supplier.name }}</td>
+            <td class="num">${{ h.unit_cost|floatformat:"2g" }}</td>
+            <td class="num">{% if h.retail_price %}${{ h.retail_price|floatformat:"2g" }}{% else %}—{% endif %}{% if h.margin_percent %} <span class="muted">{{ h.margin_percent|floatformat:"0" }}%</span>{% endif %}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+    </details>
+    {% endif %}
+
+    <details class="line-block">
+      <summary>Corregir lo leído</summary>
+      <form class="correct" hx-post="{% url 'receiving:line_correct' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+        {% localize off %}
+        <label class="short">Cantidad<input name="quantity" inputmode="decimal" value="{{ line.quantity|default_if_none:'' }}"></label>
+        <label class="short">Costo<input name="unit_cost" inputmode="decimal" value="{{ line.unit_cost }}" required></label>
+        <label class="short">Importe<input name="amount" inputmode="decimal" value="{{ line.amount }}" required></label>
+        {% endlocalize %}
+        <label>Descripción<input name="description" value="{{ line.description }}" required maxlength="300"></label>
+        <label class="short">Clave<input name="supplier_code" value="{{ line.supplier_code }}" maxlength="60"></label>
+        <button class="btn btn-small" type="submit">Guardar corrección</button>
+      </form>
+    </details>
+
+    <footer class="line-actions">
+      {% if line.status == 'discarded' %}
+        <button class="btn" hx-post="{% url 'receiving:line_undo' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">Deshacer «no llegó»</button>
+      {% else %}
+        <button class="btn btn-quiet" hx-post="{% url 'receiving:line_not_arrived' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">✗ No llegó</button>
+        {% if line.status == 'flagged' %}
+        <button class="btn btn-primary" hx-post="{% url 'receiving:line_accept' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">✓ Lo leído está bien</button>
+        {% endif %}
+      {% endif %}
+    </footer>
+  {% else %}
+    <p class="small muted">
+      {% if line.product %}Producto: <b>{{ line.product.name }}</b>{% endif %}
+      {% if line.received_quantity is not None %} · llegaron {{ line.received_quantity|floatformat:"-3" }}{% endif %}
+      {% if line.retail_price %} · precio ${{ line.retail_price|floatformat:"2g" }} ({{ line.margin_percent|floatformat:"-2" }}%){% endif %}
+    </p>
+  {% endif %}
+</article>

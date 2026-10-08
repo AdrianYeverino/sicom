@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Entrada · {% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ entry.supplier.name }}</h1>
+    <p class="muted">Folio {{ entry.folio|default:"—" }} · {{ entry.entry_date|date:"d M Y" }} · confirmó {{ entry.confirmed_by.get_username }} el {{ entry.confirmed_at|date:"d M Y H:i" }}</p>
+  </div>
+  <a class="btn" href="?format=csv">Descargar CSV</a>
+</div>
+
+<table class="table">
+  <thead><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Costo</th><th class="num hide-narrow">Subtotal</th><th class="num">Precio</th></tr></thead>
+  <tbody>
+  {% for line in lines %}
+    <tr>
+      <td>{{ line.product.name }}{% if line.source_line.supplier_code %} <span class="muted small">· {{ line.source_line.supplier_code }}</span>{% endif %}</td>
+      <td class="num">{{ line.quantity|floatformat:"-3" }}</td>
+      <td class="num">${{ line.unit_cost|floatformat:"2g" }}</td>
+      <td class="num hide-narrow">${{ line.subtotal|floatformat:"2g" }}</td>
+      <td class="num">{% if line.retail_price %}${{ line.retail_price|floatformat:"2g" }} <span class="muted small">{{ line.margin_percent|floatformat:"0" }}%</span>{% else %}—{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td colspan="3">Subtotal recibido</td><td class="num hide-narrow">${{ subtotal|floatformat:"2g" }}</td><td></td></tr></tfoot>
+</table>
+{% if entry.printed_total %}<p class="muted">Total impreso en la hoja (con IVA): ${{ entry.printed_total|floatformat:"2g" }}</p>{% endif %}
+
+{% if not_arrived %}
+<h2 class="section-title">No llegaron</h2>
+<ul class="plain">{% for l in not_arrived %}<li>{{ l.description }} <span class="muted small">· facturado {{ l.quantity|floatformat:"-3" }}</span></li>{% endfor %}</ul>
+{% endif %}
+<p><a href="{% url 'receiving:review' entry.document.pk %}">Ver el documento y sus fotos</a></p>
+{% endblock %}
