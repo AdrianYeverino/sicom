@@ -24,6 +24,10 @@ class ArithmeticTest(SimpleTestCase):
         self.assertTrue(adds_up(D("2"), D("50.00"), D("10"), D("90.00"), D("0.01")))
         self.assertFalse(adds_up(D("2"), D("50.00"), None, D("90.00"), D("0.01")))
 
+    def test_a_truncated_unit_cost_drifts_almost_a_cent_per_unit(self):
+        # Printed 25.64 for a real 25.6467: 3 units print 76.94, not 76.92.
+        self.assertTrue(adds_up(D("3"), D("25.64"), None, D("76.94"), D("0.01")))
+
     def test_a_unit_cost_rounded_to_cents_drifts_with_the_quantity(self):
         # Printed 3.28 for a real 3.2845: 20 units print 65.69, not 65.60.
         self.assertTrue(adds_up(D("20"), D("3.28"), None, D("65.69"), D("0.01")))

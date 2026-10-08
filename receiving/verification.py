@@ -10,8 +10,9 @@ from .models import DocumentWarning, LineReason, LineStatus
 
 PER_LINE_ROUNDING = Decimal("0.03")
 HUNDRED = Decimal("100")
-# A unit cost printed rounded to cents is off by up to half a cent per unit.
-PER_UNIT_ROUNDING = Decimal("0.005")
+# A unit cost printed to cents can be off by up to one cent per unit: some
+# suppliers round it, others truncate it (25.6467 printed as 25.64).
+PER_UNIT_ROUNDING = Decimal("0.01")
 
 
 def net_cost(unit_cost, discount_percent):
