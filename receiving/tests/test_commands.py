@@ -60,3 +60,13 @@ class BenchTest(TestCase):
         self.assertEqual(document.pages.count(), 1)
         self.assertEqual(document.status, DocumentStatus.IN_REVIEW)
         self.assertIn("1 documentos", out.getvalue())
+
+
+class MetricsScreenTest(TestCase):
+    def test_only_staff_see_the_metrics(self):
+        user = f.user("clerk")
+        self.client.force_login(user)
+        self.assertEqual(self.client.get("/metrics/").status_code, 302)
+        user.is_staff = True
+        user.save()
+        self.assertContains(self.client.get("/metrics/"), "Renglones que cuadran")

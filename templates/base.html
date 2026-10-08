@@ -21,6 +21,7 @@
     {% url 'receiving:documents' as documents_url %}{% url 'receiving:entries' as entries_url %}
     <a href="{{ documents_url }}" {% if request.path == documents_url %}aria-current="page"{% endif %}>Documentos</a>
     <a href="{{ entries_url }}" {% if request.path == entries_url %}aria-current="page"{% endif %}>Entradas</a>
+    {% if user.is_staff %}{% url 'receiving:metrics' as metrics_url %}<a href="{{ metrics_url }}" {% if request.path == metrics_url %}aria-current="page"{% endif %}>Métricas</a>{% endif %}
   </nav>
   <div class="top-user">
     <button class="icon-btn" type="button" title="Cambiar tema" aria-label="Cambiar tema"

@@ -13,13 +13,14 @@ from django.conf import settings
 from django.contrib import messages
 from django.db import IntegrityError
 from django.db.models import Count, Q
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from catalog.models import Product, Supplier
 
-from . import images, pricing, services
+from . import images, measurements, pricing, services
 from .matching import Catalog
 from .models import (
     ConfirmedEntry,
@@ -422,3 +423,9 @@ def entry(request, entry_pk):
         "subtotal": sum((line.subtotal for line in lines), Decimal("0")),
         "not_arrived": found.document.lines.filter(status=LineStatus.DISCARDED),
     })
+
+
+@staff_member_required
+def metrics(request):
+    """The project's goals on confirmed documents. For the administrator."""
+    return render(request, "receiving/metrics.html", {"m": measurements.measure()})

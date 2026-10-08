@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Métricas · {% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Métricas</h1>
+</div>
+<p class="muted">Sobre {{ m.documents }} documentos confirmados y {{ m.lines }} renglones confirmados. La referencia es lo que la persona confirmó; cada renglón se compara con lo que leyó el modelo. Los renglones que no llegaron no cuentan.</p>
+
+<table class="table">
+  <thead><tr><th>Meta</th><th class="num">Resultado</th><th class="num">Meta</th></tr></thead>
+  <tbody>
+  {% for label, shown, goal, met in m.rows %}
+    <tr>
+      <td>{{ label }}</td>
+      <td class="num {% if m.lines %}{% if met %}ok-text{% else %}bad-text{% endif %}{% endif %}">{{ shown }}</td>
+      <td class="num">≥ {{ goal }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="section-title">Costo de la lectura</h2>
+<dl class="totals">
+  <div><dt>Lecturas pagadas</dt><dd class="num">{{ m.readings_paid }}</dd></div>
+  <div><dt>Gastado</dt><dd class="num">${{ m.spent_usd|floatformat:4 }} USD</dd></div>
+  <div><dt>Por página</dt><dd class="num">${{ m.cost_per_page|floatformat:5 }} USD</dd></div>
+  <div><dt>Tokens de entrada por página</dt><dd class="num">{{ m.tokens_per_page|floatformat:0 }}</dd></div>
+</dl>
+{% endblock %}
