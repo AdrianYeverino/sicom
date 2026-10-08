@@ -161,10 +161,10 @@ def _line_context(line, catalog=None, error=""):
         "proposed_quantity": proposed_quantity(line),
         "received": received,
         "received_more": received is not None and line.quantity is not None and received > line.quantity,
-        "price_options": pricing.options(line.unit_cost, line.product, line.handwritten_price),
+        "price_options": pricing.options(line.net_unit_cost, line.product, line.handwritten_price),
         "history": _history(line.product),
         "editable": line.document.status == DocumentStatus.IN_REVIEW,
-        "cost_with_tax": (line.unit_cost * (1 + settings.TAX_RATE)).quantize(Decimal("0.01")),
+        "cost_with_tax": (line.net_unit_cost * (1 + settings.TAX_RATE)).quantize(Decimal("0.01")),
     }
 
 
@@ -172,7 +172,7 @@ def _summary(document):
     lines = list(document.lines.all())
     received_total = sum(
         (
-            (line.received_quantity if line.received_quantity is not None else (line.quantity or 0)) * line.unit_cost
+            (line.received_quantity if line.received_quantity is not None else (line.quantity or 0)) * line.net_unit_cost
             for line in lines
             if line.status != LineStatus.DISCARDED
         ),
@@ -244,7 +244,7 @@ def _line_action(action):
 
 def _correct(request, line):
     values = {}
-    for name in ("quantity", "unit_cost", "amount"):
+    for name in ("quantity", "unit_cost", "discount_percent", "amount"):
         if name in request.POST:
             values[name] = _decimal(request.POST[name])
     for name in ("description", "supplier_code", "unit"):

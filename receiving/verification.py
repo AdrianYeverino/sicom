@@ -9,6 +9,23 @@ from decimal import Decimal
 from .models import DocumentWarning, LineReason, LineStatus
 
 PER_LINE_ROUNDING = Decimal("0.03")
+HUNDRED = Decimal("100")
+# A unit cost printed rounded to cents is off by up to half a cent per unit.
+PER_UNIT_ROUNDING = Decimal("0.005")
+
+
+def net_cost(unit_cost, discount_percent):
+    """What one unit really costs after the line's discount."""
+    if not discount_percent:
+        return unit_cost
+    return (unit_cost * (1 - discount_percent / HUNDRED)).quantize(Decimal("0.0001"))
+
+
+def adds_up(quantity, unit_cost, discount_percent, amount, tolerance):
+    """quantity × net cost = amount, allowing the rounding of a printed unit cost."""
+    expected = quantity * unit_cost * (1 - (discount_percent or 0) / HUNDRED)
+    room = max(tolerance, abs(quantity) * PER_UNIT_ROUNDING)
+    return abs(expected - amount) <= room
 
 
 @dataclass
@@ -61,7 +78,10 @@ def merge(pages):
         merged.lines.extend((key, line) for line in content.lines)
     if merged.page_count:
         seen = {content.page_number for _, content in pages if content.page_number}
-        merged.missing_pages = [n for n in range(1, merged.page_count + 1) if n not in seen]
+        missing = [n for n in range(1, merged.page_count + 1) if n not in seen]
+        # A page without its printed number is one of the unseen ones.
+        unnumbered = sum(1 for _, content in pages if not content.page_number)
+        merged.missing_pages = missing[unnumbered:]
     return merged
 
 
@@ -78,7 +98,7 @@ def check_line(line, recognition, last_cost, thresholds):
     tolerance = thresholds["amount_tolerance"]
     if line.quantity is None:
         return LineCheck(LineStatus.FLAGGED, LineReason.MISSING_VALUE, None)
-    matches = abs(line.quantity * line.unit_cost - line.amount) <= tolerance
+    matches = adds_up(line.quantity, line.unit_cost, line.discount_percent, line.amount, tolerance)
     if not matches:
         return LineCheck(LineStatus.FLAGGED, LineReason.AMOUNT_MISMATCH, False)
     if line.confidence < thresholds["min_confidence"]:
@@ -87,16 +107,18 @@ def check_line(line, recognition, last_cost, thresholds):
         return LineCheck(LineStatus.FLAGGED, LineReason.CODE_MISMATCH, True)
     if recognition.product is None:
         return LineCheck(LineStatus.FLAGGED, LineReason.UNRECOGNIZED_PRODUCT, True)
-    if last_cost and abs(line.unit_cost - last_cost) / last_cost > thresholds["cost_variation"]:
+    cost = net_cost(line.unit_cost, line.discount_percent)
+    if last_cost and abs(cost - last_cost) / last_cost > thresholds["cost_variation"]:
         return LineCheck(LineStatus.RESOLVED, LineReason.COST_VARIATION, True)
     return LineCheck(LineStatus.RESOLVED, LineReason.NONE, True)
 
 
 def proposed_quantity(line):
     """For a hidden quantity: amount ÷ cost, when it comes out whole enough."""
-    if line.quantity is not None or not line.unit_cost:
+    cost = net_cost(line.unit_cost, line.discount_percent)
+    if line.quantity is not None or not cost:
         return None
-    value = (line.amount / line.unit_cost).quantize(Decimal("0.001"))
+    value = (line.amount / cost).quantize(Decimal("0.001"))
     return value if value > 0 else None
 
 

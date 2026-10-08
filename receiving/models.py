@@ -7,6 +7,8 @@ Final zone: ConfirmedEntry and EntryLine, created only from approved lines;
 in the store system they map onto a purchase and its lines.
 """
 
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -210,6 +212,8 @@ class ProvisionalLine(TrackedModel, TimestampedModel):
     supplier_code = models.CharField("clave del proveedor", max_length=60, blank=True)
     description = models.CharField("descripción", max_length=300)
     unit_cost = models.DecimalField("costo unitario", **MONEY)
+    # Printed on some sheets (Sada: DESC %). The real cost is net of it.
+    discount_percent = models.DecimalField("descuento %", **PERCENT, null=True, blank=True)
     # Only to check the sheet's arithmetic: the entry calculates its own subtotal.
     amount = models.DecimalField("importe", **MONEY)
     # The retail price the store sometimes writes by hand next to the cost.
@@ -230,7 +234,7 @@ class ProvisionalLine(TrackedModel, TimestampedModel):
     corrected_by_person = models.BooleanField("corregido por la persona", default=False)
 
     tracked_fields = (
-        "quantity", "unit", "supplier_code", "description", "unit_cost", "amount", "status", "product",
+        "quantity", "unit", "supplier_code", "description", "unit_cost", "discount_percent", "amount", "status", "product",
         "received_quantity", "margin_percent", "retail_price",
     )
 
@@ -280,7 +284,18 @@ class ProvisionalLine(TrackedModel, TimestampedModel):
             models.CheckConstraint(
                 condition=null_or_at_least("handwritten_price"), name="provisional_lines_handwritten_not_negative"
             ),
+            models.CheckConstraint(
+                condition=Q(discount_percent__isnull=True) | Q(discount_percent__gte=0, discount_percent__lt=100),
+                name="provisional_lines_discount_range",
+            ),
         ]
+
+    @property
+    def net_unit_cost(self):
+        """What one unit really costs: the printed cost minus the line's discount."""
+        if not self.discount_percent:
+            return self.unit_cost
+        return (self.unit_cost * (1 - self.discount_percent / 100)).quantize(Decimal("0.01"))
 
     def __str__(self):
         return f"{self.position}. {self.description}"

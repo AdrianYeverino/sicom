@@ -1,34 +1,163 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["es_hoja", "pagina", "paginas_totales", "proveedor", "rfc_proveedor", "tipo_documento", "folio", "fecha", "subtotal", "iva", "total", "renglones"],
+  "required": [
+    "es_hoja",
+    "pagina",
+    "paginas_totales",
+    "proveedor",
+    "rfc_proveedor",
+    "tipo_documento",
+    "folio",
+    "fecha",
+    "subtotal",
+    "iva",
+    "total",
+    "renglones"
+  ],
   "properties": {
-    "es_hoja": { "type": "boolean", "description": "true si la foto es una factura, remision, nota o pedido de un proveedor" },
-    "pagina": { "type": ["integer", "null"], "description": "Numero de pagina impreso, o null si no aparece" },
-    "paginas_totales": { "type": ["integer", "null"], "description": "Total de paginas impreso, o null si no aparece" },
-    "proveedor": { "type": ["string", "null"], "description": "Nombre del proveedor que emite la hoja" },
-    "rfc_proveedor": { "type": ["string", "null"], "description": "RFC del proveedor que emite la hoja, no el del cliente" },
-    "tipo_documento": { "type": ["string", "null"], "description": "Factura, Remision, Nota, Pedido u otro, tal como lo diga la hoja" },
-    "folio": { "type": ["string", "null"], "description": "Numero de folio, remision o pedido" },
-    "fecha": { "type": ["string", "null"], "description": "Fecha de la hoja en formato AAAA-MM-DD" },
-    "subtotal": { "type": ["number", "null"], "description": "Subtotal impreso antes de impuestos, o null si no aparece en esta pagina" },
-    "iva": { "type": ["number", "null"], "description": "IVA impreso, o null si no aparece en esta pagina" },
-    "total": { "type": ["number", "null"], "description": "Total impreso, o null si no aparece en esta pagina" },
+    "es_hoja": {
+      "type": "boolean",
+      "description": "true si la foto es una factura, remision, nota o pedido de un proveedor"
+    },
+    "pagina": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Numero de pagina impreso, o null si no aparece"
+    },
+    "paginas_totales": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Total de paginas impreso, o null si no aparece"
+    },
+    "proveedor": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Nombre del proveedor que emite la hoja"
+    },
+    "rfc_proveedor": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "RFC del proveedor que emite la hoja, no el del cliente"
+    },
+    "tipo_documento": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Factura, Remision, Nota, Pedido u otro, tal como lo diga la hoja"
+    },
+    "folio": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Numero de folio, remision o pedido"
+    },
+    "fecha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Fecha de la hoja en formato AAAA-MM-DD"
+    },
+    "subtotal": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Subtotal impreso antes de impuestos, o null si no aparece en esta pagina"
+    },
+    "iva": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "IVA impreso, o null si no aparece en esta pagina"
+    },
+    "total": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Total impreso, o null si no aparece en esta pagina"
+    },
     "renglones": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["cantidad", "unidad", "clave", "descripcion", "costo_unitario", "importe", "precio_escrito", "confianza"],
+        "required": [
+          "cantidad",
+          "unidad",
+          "clave",
+          "descripcion",
+          "costo_unitario",
+          "descuento",
+          "importe",
+          "precio_escrito",
+          "confianza"
+        ],
         "properties": {
-          "cantidad": { "type": ["number", "null"], "description": "null solo si no se alcanza a ver" },
-          "unidad": { "type": ["string", "null"], "description": "Unidad tal como esta impresa, o null si la hoja no trae columna de unidad" },
-          "clave": { "type": ["string", "null"], "description": "Clave del producto asignada por el proveedor, o null si no hay" },
-          "descripcion": { "type": "string", "description": "Descripcion impresa del producto, copiada tal cual" },
-          "costo_unitario": { "type": "number" },
-          "importe": { "type": "number" },
-          "precio_escrito": { "type": ["number", "null"], "description": "Numero escrito a mano junto al costo de este renglon, o null si no hay" },
-          "confianza": { "type": "number", "minimum": 0, "maximum": 1, "description": "Que tan segura fue la lectura de este renglon, de 0 a 1" }
+          "cantidad": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "null solo si no se alcanza a ver"
+          },
+          "unidad": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Unidad tal como esta impresa, o null si la hoja no trae columna de unidad"
+          },
+          "clave": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Clave del producto asignada por el proveedor, o null si no hay"
+          },
+          "descripcion": {
+            "type": "string",
+            "description": "Descripcion impresa del producto, copiada tal cual"
+          },
+          "costo_unitario": {
+            "type": "number"
+          },
+          "descuento": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Porcentaje de descuento del renglon si la hoja trae columna de descuento, o null"
+          },
+          "importe": {
+            "type": "number"
+          },
+          "precio_escrito": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Numero escrito a mano junto al costo de este renglon, o null si no hay"
+          },
+          "confianza": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Que tan segura fue la lectura de este renglon, de 0 a 1"
+          }
         }
       }
     }

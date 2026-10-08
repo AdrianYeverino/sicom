@@ -31,7 +31,7 @@ from .models import (
     ReadStatus,
     ReceivedDocument,
 )
-from .verification import check_document, check_line, merge
+from .verification import adds_up, check_document, check_line, merge
 
 RETRY_PAUSES = (2, 5)  # seconds before the second and third attempt
 
@@ -183,6 +183,7 @@ def finish_reading(document, user):
                 supplier_code=line.supplier_code[:60],
                 description=line.description[:300] or "(sin descripción)",
                 unit_cost=line.unit_cost,
+                discount_percent=line.discount_percent,
                 amount=line.amount,
                 handwritten_price=line.handwritten_price,
                 confidence=min(max(line.confidence, Decimal("0")), Decimal("1")),
@@ -216,7 +217,7 @@ def _duplicate_folio(document, folio):
 
 # --- Review -------------------------------------------------------------------
 
-READ_FIELDS = ("quantity", "unit", "supplier_code", "description", "unit_cost", "amount")
+READ_FIELDS = ("quantity", "unit", "supplier_code", "description", "unit_cost", "discount_percent", "amount")
 
 
 def _editable(line):
@@ -238,7 +239,7 @@ def correct_line(line, user, **values):
             line.corrected_by_person = True
         if line.quantity is not None:
             tolerance = thresholds_of(line.document)["amount_tolerance"]
-            line.amount_matches = abs(line.quantity * line.unit_cost - line.amount) <= tolerance
+            line.amount_matches = adds_up(line.quantity, line.unit_cost, line.discount_percent, line.amount, tolerance)
         else:
             line.amount_matches = None
         _settle(line)
@@ -359,10 +360,10 @@ def set_price(line, user, margin_percent=None, retail_price=None):
     with changes_by(user, Source.REVIEW):
         if retail_price is not None:
             line.retail_price = retail_price
-            line.margin_percent = pricing.margin_for(line.unit_cost, retail_price)
+            line.margin_percent = pricing.margin_for(line.net_unit_cost, retail_price)
         else:
             line.margin_percent = margin_percent
-            line.retail_price = pricing.price_for(line.unit_cost, margin_percent)
+            line.retail_price = pricing.price_for(line.net_unit_cost, margin_percent)
         if line.margin_percent is not None and line.margin_percent < 0:
             raise ReceivingError("Ese precio queda por debajo del costo con IVA.")
         line.save()
@@ -439,7 +440,7 @@ def confirm(document, user):
                     source_line=line,
                     product=line.product,
                     quantity=received,
-                    unit_cost=line.unit_cost,
+                    unit_cost=line.net_unit_cost,
                     margin_percent=line.margin_percent,
                     retail_price=line.retail_price,
                 )
@@ -455,7 +456,7 @@ def confirm(document, user):
 def _learn(line, supplier):
     """What the next sheet of this supplier will recognize on its own."""
     product = Product.objects.select_for_update().get(pk=line.product_id)
-    product.last_cost = line.unit_cost
+    product.last_cost = line.net_unit_cost
     product.cost_source = CostSource.SUPPLIER
     if line.margin_percent is not None:
         product.margin_percent = line.margin_percent

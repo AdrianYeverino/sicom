@@ -28,7 +28,7 @@ from django.conf import settings
 HERE = Path(__file__).parent
 SCHEMA = json.loads((HERE / "schema.json").read_text(encoding="utf-8"))
 PROMPT = (HERE / "prompt.md").read_text(encoding="utf-8")
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
 TIMEOUT_SECONDS = 90
@@ -72,6 +72,7 @@ class ReadLine:
     amount: Decimal
     handwritten_price: Decimal | None
     confidence: Decimal
+    discount_percent: Decimal | None = None
 
 
 @dataclass
@@ -146,6 +147,7 @@ def to_content(data: dict) -> PageContent:
                 amount=_decimal(r["importe"]),
                 handwritten_price=_decimal(r["precio_escrito"]),
                 confidence=_decimal(r["confianza"]),
+                discount_percent=_decimal(r["descuento"]) or None,
             )
             for r in data["renglones"]
         ],

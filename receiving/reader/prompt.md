@@ -16,3 +16,4 @@ Reglas:
 12. `pagina` y `paginas_totales` salen de la leyenda impresa de página, como "1 / 2" o "Página 1 de 2". Si no hay leyenda, usa null en las dos. Una página puede no traer la cabecera del documento: entonces proveedor, folio, fecha y los demás datos de cabecera van en null.
 13. `precio_escrito` es el número escrito a mano junto al costo de ese renglón, si lo hay. Úsalo solo para ese número; cualquier otra anotación a mano se ignora.
 14. `es_hoja` es false si la foto no es un documento de un proveedor; en ese caso, `renglones` va vacío.
+15. `descuento` es el porcentaje de descuento impreso en el renglón, si la hoja trae una columna de descuento (por ejemplo DESC o % DESC). `costo_unitario` es el precio unitario impreso antes del descuento. Si no hay columna de descuento, usa null.

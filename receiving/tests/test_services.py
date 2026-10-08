@@ -59,7 +59,7 @@ def ok(page_content):
         "total": None if page_content.total is None else float(page_content.total),
         "renglones": [
             {"cantidad": None if l.quantity is None else float(l.quantity), "unidad": l.unit, "clave": l.supplier_code,
-             "descripcion": l.description, "costo_unitario": float(l.unit_cost), "importe": float(l.amount),
+             "descripcion": l.description, "costo_unitario": float(l.unit_cost), "descuento": None if l.discount_percent is None else float(l.discount_percent), "importe": float(l.amount),
              "precio_escrito": None if l.handwritten_price is None else float(l.handwritten_price),
              "confianza": float(l.confidence)}
             for l in page_content.lines

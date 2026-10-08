@@ -26,9 +26,11 @@
       {% if line.quantity is None %}<b class="bad-text">no se ve</b>{% else %}<b class="num">{{ line.quantity|floatformat:"-3" }}</b>{% endif %}</span>
     <span class="op">×</span>
     <span><span class="label">Costo</span><b class="num">${{ line.unit_cost|floatformat:"2g" }}</b></span>
+    {% if line.discount_percent %}<span><span class="label">Desc.</span><b class="num">−{{ line.discount_percent|floatformat:"-2" }}%</b></span>{% endif %}
     <span class="op">=</span>
     <span><span class="label">Importe</span><b class="num {% if line.amount_matches is False %}bad-text{% endif %}">${{ line.amount|floatformat:"2g" }}</b></span>
   </div>
+  {% if line.discount_percent %}<p class="small muted">Costo real con descuento: <b class="num">${{ line.net_unit_cost|floatformat:"2g" }}</b></p>{% endif %}
   {% if line.handwritten_price %}<p class="small muted">Escrito a mano en la hoja: <b class="num">${{ line.handwritten_price|floatformat:"2g" }}</b></p>{% endif %}
 
   {% if editable %}
@@ -129,6 +131,7 @@
         {% localize off %}
         <label class="short">Cantidad<input name="quantity" inputmode="decimal" value="{{ line.quantity|default_if_none:'' }}"></label>
         <label class="short">Costo<input name="unit_cost" inputmode="decimal" value="{{ line.unit_cost }}" required></label>
+        <label class="short">Desc. %<input name="discount_percent" inputmode="decimal" value="{{ line.discount_percent|default_if_none:'' }}"></label>
         <label class="short">Importe<input name="amount" inputmode="decimal" value="{{ line.amount }}" required></label>
         {% endlocalize %}
         <label>Descripción<input name="description" value="{{ line.description }}" required maxlength="300"></label>
