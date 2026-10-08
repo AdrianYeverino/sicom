@@ -47,19 +47,32 @@ also runs `check --deploy` and fails on missing migrations.
 
 ## Deploy
 
-Railway builds the `Dockerfile` and waits for `/health/` to answer 200
-before publishing (`railway.toml`). Variables on the service:
+The app is a plain Docker image configured by environment variables, so it
+runs the same on any container host. Nothing in the repository is specific
+to one provider.
+
+It is deployed on Railway, which builds the `Dockerfile` from `main` after CI
+passes. Service settings (kept on the service, not in the repository):
+
+| Setting | Value |
+|---|---|
+| Pre-deploy command | `python manage.py migrate --noinput` |
+| Health check | `/health/` |
+| Wait for CI | on |
+
+Variables:
 
 | Variable | Value |
 |---|---|
 | `SECRET_KEY` | long random string |
 | `DEBUG` | `0` |
-| `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` | the service domain |
-| `DATABASE_URL` | reference to the Railway Postgres |
-| `MIGRATE_ON_START` | `1` |
+| `ALLOWED_HOSTS` | the public domain |
+| `CSRF_TRUSTED_ORIGINS` | `https://` + the public domain |
+| `DATABASE_URL` | the Postgres connection URL |
 | `OPENROUTER_API_KEY` | reader key |
 | `STORE_NAME` | name shown in the app |
 
-To create the first admin account without a shell, set
-`DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` and
-`DJANGO_SUPERUSER_PASSWORD`, redeploy, then remove the password variable.
+On a host without a pre-deploy step, set `MIGRATE_ON_START=1`. To create the
+first admin account without a shell, set `DJANGO_SUPERUSER_USERNAME`,
+`DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD`, restart, then
+remove the password variable.

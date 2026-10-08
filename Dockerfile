@@ -22,11 +22,13 @@ RUN SECRET_KEY=build-only \
 RUN useradd --create-home --uid 1000 app
 USER app
 
-# Migrations do not run at startup unless asked: MIGRATE_ON_START=1 migrates
-# first and, if that fails, the server does not start. On Railway it is set on
-# the service. With DJANGO_SUPERUSER_USERNAME, _EMAIL and _PASSWORD set, the
-# first start also creates that admin account (it is skipped if it exists);
-# remove the password variable afterwards. exec makes gunicorn the main
-# process, so it gets the shutdown signal and finishes requests in flight.
-# The long timeout leaves room for reading a page (about 30 s).
+# The image does not depend on where it runs. Migrations do not run at startup
+# unless asked: on Railway they run in the service's pre-deploy command, which
+# keeps the previous version serving if they fail. Where that step does not
+# exist (compose, a VPS, a test run) start with MIGRATE_ON_START=1: it migrates
+# first and, if that fails, the server does not start. With
+# DJANGO_SUPERUSER_USERNAME, _EMAIL and _PASSWORD set, a start also creates
+# that admin account (skipped if it exists); remove the password afterwards.
+# exec makes gunicorn the main process, so it gets the shutdown signal and
+# finishes requests in flight. The long timeout leaves room for reading a page.
 CMD ["sh", "-c", "if [ \"${MIGRATE_ON_START:-0}\" = 1 ]; then python manage.py migrate --noinput || exit 1; fi; if [ -n \"${DJANGO_SUPERUSER_PASSWORD:-}\" ]; then python manage.py createsuperuser --noinput || true; fi; exec gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --access-logfile -"]
