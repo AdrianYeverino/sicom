@@ -199,9 +199,14 @@ def review(request, pk):
     for line in lines:
         line.document = document
     catalog = Catalog(document.supplier) if document.status == DocumentStatus.IN_REVIEW else None
+    cards = [_line_context(line, catalog) for line in lines]
     return render(request, "receiving/review.html", {
         **_summary(document),
-        "cards": [_line_context(line, catalog) for line in lines],
+        "cards": cards,
+        "unknown": sum(
+            1 for c in cards
+            if c["line"].product is None and c["suggestion"] is None and c["line"].reason == "unrecognized_product"
+        ),
         "pages": document.pages.all(),
         "warnings": [DocumentWarning(w).label for w in document.warnings if w in DocumentWarning.values],
         "amounts": sum((line.amount for line in lines), Decimal("0")),
@@ -304,6 +309,18 @@ def document_supplier(request, pk):
         messages.error(request, str(e))
     except IntegrityError:
         messages.error(request, "Ya existe un proveedor con ese nombre o RFC, o el RFC no tiene el formato correcto.")
+    return redirect("receiving:review", pk)
+
+
+@require_POST
+def document_new_products(request, pk):
+    document = get_object_or_404(ReceivedDocument, pk=pk)
+    try:
+        created = services.create_products_for_unrecognized(document, request.user)
+    except services.ReceivingError as e:
+        messages.error(request, str(e))
+    else:
+        messages.success(request, f"{created} productos dados de alta con su descripción. Revisa los que quedan.")
     return redirect("receiving:review", pk)
 
 

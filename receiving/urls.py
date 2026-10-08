@@ -13,6 +13,7 @@ urlpatterns = [
     path("documents/<uuid:pk>/", views.review, name="review"),
     path("documents/<uuid:pk>/summary/", views.document_summary, name="summary"),
     path("documents/<uuid:pk>/supplier/", views.document_supplier, name="supplier"),
+    path("documents/<uuid:pk>/new-products/", views.document_new_products, name="new_products"),
     path("documents/<uuid:pk>/confirm/", views.document_confirm, name="confirm"),
     path("documents/<uuid:pk>/discard/", views.document_discard, name="discard"),
     path("pages/<uuid:page_pk>/replace/", views.page_replace, name="page_replace"),

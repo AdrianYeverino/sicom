@@ -26,7 +26,7 @@
     <button class="icon-btn" type="button" title="Cambiar tema" aria-label="Cambiar tema"
             onclick="var d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('sicom.theme',d.dataset.theme)}catch(e){}">◐</button>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}
-      <button class="link-btn" type="submit" title="Salir">{{ user.get_username }} · Salir</button>
+      <button class="link-btn" type="submit" title="Salir"><span class="who">{{ user.get_username }} · </span>Salir</button>
     </form>
   </div>
 </header>

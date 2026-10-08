@@ -288,6 +288,27 @@ def create_product_for(line, user, name, unit=""):
     return link_product(line, user, product)
 
 
+def create_products_for_unrecognized(document, user):
+    """First delivery of a supplier: every unknown product becomes a new
+    product named as printed, in one tap. Lines with a likely match are left
+    alone, so a product is never duplicated by accident."""
+    if document.status != DocumentStatus.IN_REVIEW:
+        raise ReceivingError("Este documento ya no se puede modificar.")
+    catalog = Catalog(document.supplier)
+    thresholds = thresholds_of(document)
+    created = 0
+    lines = document.lines.filter(
+        status=LineStatus.FLAGGED, reason=LineReason.UNRECOGNIZED_PRODUCT, product__isnull=True
+    ).order_by("position")
+    with transaction.atomic():
+        for line in lines:
+            if catalog.recognize(line.supplier_code, line.description, thresholds).suggestion:
+                continue
+            create_product_for(line, user, line.description, line.unit)
+            created += 1
+    return created
+
+
 def mark_not_arrived(line, user):
     _editable(line)
     with changes_by(user, Source.REVIEW):
@@ -378,7 +399,7 @@ def blockers(document):
     lines = list(document.lines.all())
     flagged = sum(1 for line in lines if line.status == LineStatus.FLAGGED)
     if flagged:
-        found.append(f"Quedan {flagged} renglones separados por revisar.")
+        found.append("Queda 1 renglón separado por revisar." if flagged == 1 else f"Quedan {flagged} renglones separados por revisar.")
     if lines and all(line.status == LineStatus.DISCARDED for line in lines):
         found.append("No llegó ningún renglón: descarta el documento en lugar de confirmarlo.")
     return found

@@ -8,6 +8,8 @@ from decimal import Decimal
 
 from .models import DocumentWarning, LineReason, LineStatus
 
+PER_LINE_ROUNDING = Decimal("0.03")
+
 
 @dataclass
 class MergedDocument:
@@ -106,7 +108,11 @@ def check_document(merged, thresholds, tax_rate, today=None):
         warnings.append(DocumentWarning.MISSING_PAGES)
     amounts = sum((line.amount for _, line in merged.lines), Decimal("0"))
     tolerance = thresholds["subtotal_tolerance"]
-    if merged.subtotal is not None and abs(amounts - merged.subtotal) > tolerance:
+    # Suppliers' systems round each printed amount from unit costs with more
+    # decimals, so the printed lines drift from the subtotal a few cents per
+    # line (a real 21-line invoice: 0.52). The room grows with the lines.
+    lines_room = max(tolerance, PER_LINE_ROUNDING * len(merged.lines))
+    if merged.subtotal is not None and abs(amounts - merged.subtotal) > lines_room:
         warnings.append(DocumentWarning.SUBTOTAL_MISMATCH)
     if None not in (merged.subtotal, merged.tax, merged.total) and abs(merged.subtotal + merged.tax - merged.total) > tolerance:
         warnings.append(DocumentWarning.TOTAL_MISMATCH)

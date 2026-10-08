@@ -7,7 +7,7 @@
       <span class="muted small">{% if line.supplier_code %}Clave {{ line.supplier_code }} · {% endif %}{% if line.unit %}{{ line.unit }} · {% endif %}pág. {{ line.page.upload_order }}</span>
     </div>
     {% if line.status == 'flagged' %}
-      <span class="reason">{{ line.get_reason_display }}</span>
+      <span class="reason">{{ line.get_reason_display }}{% if line.reason == 'illegible_text' %} · {% widthratio line.confidence 1 100 %}%{% endif %}</span>
     {% elif line.status == 'discarded' %}
       <span class="status status-discarded">No llegó</span>
     {% elif line.reason == 'cost_variation' %}
@@ -46,21 +46,27 @@
           {% if line.product.last_cost %}<span class="muted small">· último costo ${{ line.product.last_cost|floatformat:"2g" }}</span>{% endif %}</p>
       {% else %}
         <p class="label">¿Qué producto es?</p>
+        <div class="inline">
         {% if suggestion %}
-        <form class="inline" hx-post="{% url 'receiving:line_link' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+        <form hx-post="{% url 'receiving:line_link' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
           <input type="hidden" name="product" value="{{ suggestion.pk }}">
           <button class="btn btn-small" type="submit">Es «{{ suggestion.name }}»</button>
         </form>
         {% endif %}
+        <form hx-post="{% url 'receiving:line_new_product' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
+          <input type="hidden" name="name" value="{{ line.description }}"><input type="hidden" name="unit" value="{{ line.unit }}">
+          <button class="btn btn-small" type="submit">Producto nuevo con este nombre</button>
+        </form>
+        </div>
       {% endif %}
-      <details class="product-pick" {% if not line.product and not suggestion %}open{% endif %}>
-        <summary>{% if line.product %}Cambiar producto{% else %}Buscar o dar de alta{% endif %}</summary>
+      <details class="product-pick">
+        <summary>{% if line.product %}Cambiar producto{% else %}Buscar otro o cambiar el nombre{% endif %}</summary>
         <input type="search" name="q" placeholder="Buscar por nombre o clave" autocomplete="off"
                hx-get="{% url 'receiving:product_search' line.pk %}" hx-trigger="input changed delay:300ms, search"
                hx-target="#results-{{ line.pk }}">
         <div id="results-{{ line.pk }}"></div>
         <form class="new-product" hx-post="{% url 'receiving:line_new_product' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
-          <label>Producto nuevo<input name="name" value="{{ line.description }}" required maxlength="200"></label>
+          <label>Nombre del producto nuevo<input name="name" value="{{ line.description }}" required maxlength="200"></label>
           <label class="short">Unidad<input name="unit" value="{{ line.unit }}" maxlength="30"></label>
           <button class="btn btn-small" type="submit">Dar de alta</button>
         </form>
@@ -71,7 +77,7 @@
     {# Received quantity #}
     <form class="line-block inline" hx-post="{% url 'receiving:line_received' line.pk %}" hx-target="#line-{{ line.pk }}" hx-swap="outerHTML">
       <label class="short"><span class="label">Llegaron</span>
-        <input name="received" inputmode="decimal" value="{{ received|default_if_none:''|unlocalize }}" autocomplete="off"></label>
+        <input name="received" inputmode="decimal" value="{% if received is not None %}{{ received|floatformat:"-3"|unlocalize }}{% endif %}" autocomplete="off"></label>
       <button class="btn btn-small" type="submit">Guardar</button>
       {% if received_more %}<span class="warn-text small">Llegó más de lo facturado</span>{% endif %}
     </form>

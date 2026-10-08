@@ -108,6 +108,11 @@ class CheckDocumentTest(SimpleTestCase):
     def test_lines_that_do_not_add_up_to_the_subtotal(self):
         self.assertIn(DocumentWarning.SUBTOTAL_MISMATCH, self.warnings(subtotal=D("170.00")))
 
+    def test_rounding_drift_grows_with_the_lines(self):
+        many = [line(amount="81.00") for _ in range(21)]
+        merged = merge([("a", page(1, 1, many, folio="R-1", subtotal=D("1700.48")))])  # 1701.00 printed lines
+        self.assertEqual(check_document(merged, THRESHOLDS, D("0.16"), today=self.today), [])
+
     def test_subtotal_plus_tax_is_not_the_total(self):
         self.assertIn(DocumentWarning.TOTAL_MISMATCH, self.warnings(subtotal=D("162.00"), tax=D("25.92"), total=D("190.00")))
 

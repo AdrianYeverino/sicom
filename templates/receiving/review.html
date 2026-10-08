@@ -50,7 +50,7 @@
         {% endif %}
         <form method="post" action="{% url 'receiving:supplier' document.pk %}" class="inline">{% csrf_token %}
           <label>Nuevo<input name="name" value="{{ document.supplier_name_read }}" required maxlength="120"></label>
-          <label class="short">RFC<input name="rfc" value="{{ document.supplier_rfc_read }}" maxlength="13" autocapitalize="characters"></label>
+          <label class="rfc">RFC<input name="rfc" value="{{ document.supplier_rfc_read }}" maxlength="13" autocapitalize="characters"></label>
           <button class="btn btn-small" type="submit">Dar de alta</button>
         </form>
       </details>
@@ -60,6 +60,12 @@
     </section>
 
     {% if flagged %}<h2 class="section-title">Por revisar <span class="pill-warn">{{ flagged }}</span></h2>{% endif %}
+    {% if unknown > 1 and document.status == 'in_review' %}
+    <form method="post" action="{% url 'receiving:new_products' document.pk %}" class="bulk">{% csrf_token %}
+      <p class="small muted">{{ unknown }} productos no están en el catálogo ni se parecen a ninguno. Si es la primera entrega de este proveedor, dalos de alta de una vez con su descripción y ajusta los nombres después.</p>
+      <button class="btn" type="submit">Dar de alta los {{ unknown }} con su descripción</button>
+    </form>
+    {% endif %}
     <div class="lines">
       {% for card in cards %}{% with line=card.line %}
         {% include "receiving/_line.html" with line=card.line error=card.error suggestion=card.suggestion proposed_quantity=card.proposed_quantity received=card.received received_more=card.received_more price_options=card.price_options history=card.history editable=card.editable cost_with_tax=card.cost_with_tax %}
