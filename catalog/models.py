@@ -2,20 +2,27 @@
 
 Kept minimal on purpose: the store system already has a full catalog, and
 these tables map one to one onto its suppliers, products, supplier codes
-and aliases.
+and aliases. It starts empty and grows with every confirmed delivery.
 """
 
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
 
-from core.db import MONEY, BaseModel, not_blank, one_of
+from core.db import MONEY, PERCENT, TimestampedModel, not_blank, null_or_at_least, one_of
+from core.history import TrackedModel
+
+# Mexican RFC: 3 letters (companies) or 4 (people), birth or founding date, 3 characters.
+RFC_PATTERN = r"^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$"
 
 
-class Supplier(BaseModel):
+class Supplier(TrackedModel, TimestampedModel):
     name = models.CharField("nombre", max_length=120)
+    # Printed on every sheet: recognizes the supplier however its name is written.
+    rfc = models.CharField("RFC", max_length=13, blank=True)
     active = models.BooleanField("activo", default=True)
-    created_at = models.DateTimeField("creado en", auto_now_add=True)
+
+    tracked_fields = ("name", "rfc", "active")
 
     class Meta:
         db_table = "suppliers"
@@ -24,7 +31,11 @@ class Supplier(BaseModel):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(Lower("name"), name="suppliers_name_unique"),
+            models.UniqueConstraint(fields=["rfc"], condition=~Q(rfc=""), name="suppliers_rfc_unique"),
             models.CheckConstraint(condition=not_blank("name"), name="suppliers_name_not_blank"),
+            models.CheckConstraint(
+                condition=Q(rfc="") | Q(rfc__regex=RFC_PATTERN), name="suppliers_rfc_format"
+            ),
         ]
 
     def __str__(self):
@@ -37,15 +48,20 @@ class CostSource(models.TextChoices):
     UNKNOWN = "unknown", "Desconocido"
 
 
-class Product(BaseModel):
+class Product(TrackedModel, TimestampedModel):
     name = models.CharField("nombre", max_length=200)
     unit = models.CharField("unidad", max_length=30, blank=True)
     last_cost = models.DecimalField("último costo", **MONEY, null=True, blank=True)
     cost_source = models.CharField(
         "origen del costo", max_length=12, choices=CostSource, default=CostSource.UNKNOWN
     )
+    # Each product has its own margin; empty means the store default applies.
+    margin_percent = models.DecimalField("margen %", **PERCENT, null=True, blank=True)
+    # Retail price with tax, as the store last set it.
+    retail_price = models.DecimalField("precio público", **MONEY, null=True, blank=True)
     active = models.BooleanField("activo", default=True)
-    created_at = models.DateTimeField("creado en", auto_now_add=True)
+
+    tracked_fields = ("name", "unit", "last_cost", "cost_source", "margin_percent", "retail_price", "active")
 
     class Meta:
         db_table = "products"
@@ -57,8 +73,12 @@ class Product(BaseModel):
             models.CheckConstraint(
                 condition=one_of("cost_source", CostSource.values), name="products_cost_source_valid"
             ),
+            models.CheckConstraint(condition=null_or_at_least("last_cost"), name="products_cost_not_negative"),
             models.CheckConstraint(
-                condition=Q(last_cost__isnull=True) | Q(last_cost__gte=0), name="products_cost_not_negative"
+                condition=null_or_at_least("margin_percent"), name="products_margin_not_negative"
+            ),
+            models.CheckConstraint(
+                condition=null_or_at_least("retail_price"), name="products_price_not_negative"
             ),
             # Every cost has a source, and an empty cost is "unknown", never anything else.
             models.CheckConstraint(
@@ -72,7 +92,7 @@ class Product(BaseModel):
         return self.name
 
 
-class ProductSupplierCode(BaseModel):
+class ProductSupplierCode(TrackedModel, TimestampedModel):
     """How a supplier knows a product. The first criterion to recognize a line."""
 
     product = models.ForeignKey(
@@ -82,8 +102,10 @@ class ProductSupplierCode(BaseModel):
         Supplier, on_delete=models.PROTECT, related_name="product_codes", verbose_name="proveedor"
     )
     code = models.CharField("clave", max_length=60)
-    supplier_description = models.CharField("descripción del proveedor", max_length=200, blank=True)
-    created_at = models.DateTimeField("creado en", auto_now_add=True)
+    # As this supplier prints it: also matched by similarity.
+    supplier_description = models.CharField("descripción del proveedor", max_length=300, blank=True)
+
+    tracked_fields = ("product", "supplier", "code", "supplier_description")
 
     class Meta:
         db_table = "product_supplier_codes"
@@ -98,14 +120,15 @@ class ProductSupplierCode(BaseModel):
         return f"{self.supplier}: {self.code}"
 
 
-class ProductAlias(BaseModel):
-    """Another name for the product, matched against the line description."""
+class ProductAlias(TrackedModel, TimestampedModel):
+    """Another name for the product, for suppliers that print no code."""
 
     product = models.ForeignKey(
         Product, on_delete=models.PROTECT, related_name="aliases", verbose_name="producto"
     )
-    alias = models.CharField("nombre alterno", max_length=200)
-    created_at = models.DateTimeField("creado en", auto_now_add=True)
+    alias = models.CharField("nombre alterno", max_length=300)
+
+    tracked_fields = ("product", "alias")
 
     class Meta:
         db_table = "product_aliases"

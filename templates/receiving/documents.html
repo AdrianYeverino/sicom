@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ store_name }}</title></head>
+<body>
+<h1>{{ store_name }}</h1>
+<ul>{% for d in documents %}<li>{{ d }} · {{ d.get_status_display }}</li>{% empty %}<li>Sin documentos.</li>{% endfor %}</ul>
+</body>
+</html>

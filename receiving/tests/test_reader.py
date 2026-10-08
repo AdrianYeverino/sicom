@@ -3,60 +3,9 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest import mock
 
-from django.db import IntegrityError
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import SimpleTestCase, override_settings
 
-from . import reader
-from .models import LineReason, LineStatus, ProvisionalLine, ReceivedSheet, SheetStatus
-
-
-def make_line(sheet, **fields):
-    values = {
-        "position": 1,
-        "quantity": Decimal("2"),
-        "description": "WELDING ROD 3/32",
-        "unit_cost": Decimal("40.50"),
-        "amount": Decimal("81.00"),
-        "confidence": Decimal("1"),
-        "amount_matches": True,
-    }
-    values.update(fields)
-    return ProvisionalLine.objects.create(sheet=sheet, **values)
-
-
-class ProvisionalLineConstraintsTest(TestCase):
-    def setUp(self):
-        self.sheet = ReceivedSheet.objects.create()
-
-    def test_a_flagged_line_says_why(self):
-        with self.assertRaises(IntegrityError):
-            make_line(self.sheet, status=LineStatus.FLAGGED)
-
-    def test_a_flagged_line_with_its_reason(self):
-        make_line(self.sheet, status=LineStatus.FLAGGED, reason=LineReason.AMOUNT_MISMATCH)
-
-    def test_a_resolved_line_may_carry_the_cost_warning(self):
-        make_line(self.sheet, reason=LineReason.COST_VARIATION)
-
-    def test_a_resolved_line_cannot_carry_a_flag_reason(self):
-        with self.assertRaises(IntegrityError):
-            make_line(self.sheet, reason=LineReason.ILLEGIBLE_TEXT)
-
-    def test_confidence_is_between_0_and_1(self):
-        with self.assertRaises(IntegrityError):
-            make_line(self.sheet, confidence=Decimal("1.5"))
-
-    def test_one_line_per_position(self):
-        make_line(self.sheet)
-        with self.assertRaises(IntegrityError):
-            make_line(self.sheet)
-
-
-class ReceivedSheetConstraintsTest(TestCase):
-    def test_a_confirmed_sheet_has_its_date(self):
-        with self.assertRaises(IntegrityError):
-            ReceivedSheet.objects.create(status=SheetStatus.CONFIRMED)
-
+from receiving import reader
 
 READING = {
     "proveedor": "ACME TOOLS",

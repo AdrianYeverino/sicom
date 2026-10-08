@@ -14,8 +14,8 @@ Django 6.1 · Python 3.13 · PostgreSQL 18 · deployed on Railway.
 |---|---|
 | `accounts` | Login accounts (UUID user model). |
 | `catalog` | Suppliers, products, supplier codes and aliases: what lines are matched against. |
-| `receiving` | Received sheets, provisional lines, confirmed entries, and the sheet reader (`receiving/reader/`). |
-| `core` | Shared model helpers. Not an app. |
+| `receiving` | Received documents and their pages, page readings, provisional lines, confirmed entries, and the sheet reader (`receiving/reader/`). |
+| `core` | Shared model helpers and the change history (`change_log`). |
 
 The reader's `schema.json` and `prompt.md` are kept in Spanish exactly as they
 were measured in the model comparison; see `receiving/reader/__init__.py`.

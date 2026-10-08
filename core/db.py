@@ -16,6 +16,18 @@ class BaseModel(models.Model):
         abstract = True
 
 
+class TimestampedModel(BaseModel):
+    """For every table that can change. updated_at is indexed: "everything that
+    changed since" is the query a future sync needs. Nothing is ever deleted
+    (rows are deactivated or discarded), so no deletion log is needed."""
+
+    created_at = models.DateTimeField("creado en", auto_now_add=True)
+    updated_at = models.DateTimeField("actualizado en", auto_now=True, db_index=True)
+
+    class Meta:
+        abstract = True
+
+
 def one_of(field, values):
     """CHECK that the field only takes the values of its choices."""
     return Q(**{f"{field}__in": list(values)})
@@ -26,6 +38,11 @@ def not_blank(field):
     return Q(**{f"{field}__regex": r"\S"})
 
 
-# Money with cents and quantities with three decimals (meters, kilos).
+def null_or_at_least(field, minimum=0):
+    return Q(**{f"{field}__isnull": True}) | Q(**{f"{field}__gte": minimum})
+
+
+# Money with cents, quantities with three decimals (meters, kilos), percentages.
 MONEY = {"max_digits": 12, "decimal_places": 2}
 QUANTITY = {"max_digits": 12, "decimal_places": 3}
+PERCENT = {"max_digits": 5, "decimal_places": 2}

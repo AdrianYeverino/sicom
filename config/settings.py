@@ -7,6 +7,7 @@ production). Nothing secret is written here: this code goes to GitHub.
 """
 
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 import dj_database_url
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # In dependency order: each app only knows the ones above it.
+    "core",
     "accounts",
     "catalog",
     "receiving",
@@ -57,6 +59,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Every page needs a session, except the ones Django marks (login, health).
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    # After authentication: the history records who made each change.
+    "core.history.HistoryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -73,6 +79,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context.store",
             ],
         },
     },
@@ -138,12 +145,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Where the sheet photos live is still undecided: Railway's disk is not
-# persistent. Until then they go to the local file system.
-MEDIA_URL = "media/"
-
-MEDIA_ROOT = BASE_DIR / "media"
-
 # Versioned static file names only on the server: that mode needs a manifest
 # written by collectstatic when the image is built. Neither the development
 # server nor the tests should depend on that step.
@@ -165,14 +166,58 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-# Sheet reader (OpenRouter). The key is only needed when a sheet is read:
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "receiving:documents"
+LOGOUT_REDIRECT_URL = "login"
+
+
+# The store. Its name comes from the environment: the code is not tied to one business.
+
+STORE_NAME = config("STORE_NAME", default="SICOM")
+
+# Prices on supplier sheets come before tax; the store sells with tax included.
+TAX_RATE = config("TAX_RATE", default="0.16", cast=Decimal)
+
+# Only for products that never had a margin of their own.
+DEFAULT_MARGIN_PERCENT = config("DEFAULT_MARGIN_PERCENT", default="55", cast=Decimal)
+
+
+# Sheet reader (OpenRouter). The key is only needed when a page is read:
 # the rest of the app, the tests and the image build work without it.
 
 OPENROUTER_API_KEY = config("OPENROUTER_API_KEY", default="")
 
 READER_MODEL = config("READER_MODEL", default="minimax/minimax-m3")
 
+# The provider measured in the model comparison. Empty: any provider, and the
+# one used is recorded on each reading.
+READER_PROVIDER = config("READER_PROVIDER", default="together")
+
 READER_MAX_TOKENS = config("READER_MAX_TOKENS", default=8000, cast=int)
+
+# Long side of the image sent to the model. Every provider gets the same
+# image, and it is the main lever on input tokens.
+READER_IMAGE_MAX_SIDE = config("READER_IMAGE_MAX_SIDE", default=2000, cast=int)
+
+# Saved readings for development and tests: each photo is paid for once.
+# Off unless set. Keep it outside the repository: readings hold supplier costs.
+READER_CACHE_DIR = config("READER_CACHE_DIR", default="")
+
+# Verification thresholds. Starting points, to be calibrated with real sheets;
+# each document stores the values it was checked with.
+THRESHOLDS = {
+    "amount_tolerance": config("THRESHOLD_AMOUNT_TOLERANCE", default="0.01", cast=Decimal),
+    "subtotal_tolerance": config("THRESHOLD_SUBTOTAL_TOLERANCE", default="0.05", cast=Decimal),
+    "min_confidence": config("THRESHOLD_MIN_CONFIDENCE", default="0.80", cast=Decimal),
+    "match_similarity": config("THRESHOLD_MATCH_SIMILARITY", default="0.85", cast=Decimal),
+    "suggest_similarity": config("THRESHOLD_SUGGEST_SIMILARITY", default="0.60", cast=Decimal),
+    "cost_variation": config("THRESHOLD_COST_VARIATION", default="0.15", cast=Decimal),
+}
+
+# Uploads: a phone photo is 1-8 MB; the request carries one photo at a time.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_BYTES
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_BYTES
 
 
 # Security. Off in development, because localhost has no HTTPS.

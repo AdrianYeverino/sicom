@@ -47,3 +47,28 @@ class AliasTest(TestCase):
         ProductAlias.objects.create(product=product, alias="Portland")
         with self.assertRaises(IntegrityError):
             ProductAlias.objects.create(product=product, alias="PORTLAND")
+
+
+class SupplierRfcTest(TestCase):
+    def test_an_rfc_is_unique(self):
+        Supplier.objects.create(name="Acme Tools", rfc="ACM010101AB1")
+        with self.assertRaises(IntegrityError):
+            Supplier.objects.create(name="Acme Tools Norte", rfc="ACM010101AB1")
+
+    def test_suppliers_without_rfc_do_not_collide(self):
+        Supplier.objects.create(name="Acme Tools")
+        Supplier.objects.create(name="Northwind Hardware")
+
+    def test_the_rfc_has_its_format(self):
+        with self.assertRaises(IntegrityError):
+            Supplier.objects.create(name="Acme Tools", rfc="not an rfc")
+
+
+class ProductMarginTest(TestCase):
+    def test_each_product_keeps_its_own_margin_and_price(self):
+        product = Product.objects.create(name="Wood screw", margin_percent=Decimal("40"), retail_price=Decimal("2.50"))
+        self.assertEqual(product.margin_percent, Decimal("40"))
+
+    def test_a_margin_cannot_be_negative(self):
+        with self.assertRaises(IntegrityError):
+            Product.objects.create(name="Wood screw", margin_percent=Decimal("-1"))
