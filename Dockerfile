@@ -19,13 +19,14 @@ RUN SECRET_KEY=build-only \
 
 # The server runs without root: if someone managed to run code through the
 # app, they would not be root in the container.
-RUN useradd --create-home --uid 1000 app && mkdir -p /app/media && chown app /app/media
+RUN useradd --create-home --uid 1000 app
 USER app
 
-# Migrations do not run at startup unless asked. On Railway the pre-deploy
-# command in railway.toml applies them. Where that step does not exist
-# (compose, a test run) start with MIGRATE_ON_START=1: it migrates first and,
-# if that fails, the server does not start. exec makes gunicorn the main
+# Migrations do not run at startup unless asked: MIGRATE_ON_START=1 migrates
+# first and, if that fails, the server does not start. On Railway it is set on
+# the service. With DJANGO_SUPERUSER_USERNAME, _EMAIL and _PASSWORD set, the
+# first start also creates that admin account (it is skipped if it exists);
+# remove the password variable afterwards. exec makes gunicorn the main
 # process, so it gets the shutdown signal and finishes requests in flight.
-# The long timeout leaves room for a sheet reading (about 30 s per sheet).
-CMD ["sh", "-c", "if [ \"${MIGRATE_ON_START:-0}\" = 1 ]; then python manage.py migrate --noinput || exit 1; fi; exec gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --access-logfile -"]
+# The long timeout leaves room for reading a page (about 30 s).
+CMD ["sh", "-c", "if [ \"${MIGRATE_ON_START:-0}\" = 1 ]; then python manage.py migrate --noinput || exit 1; fi; if [ -n \"${DJANGO_SUPERUSER_PASSWORD:-}\" ]; then python manage.py createsuperuser --noinput || true; fi; exec gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 120 --access-logfile -"]

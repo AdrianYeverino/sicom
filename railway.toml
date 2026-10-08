@@ -1,13 +1,13 @@
 # Railway reads this file on every deploy, so the settings live in the repo
 # and not only in the dashboard.
+#
+# Migrations run at container start (MIGRATE_ON_START=1 on the service): a
+# preDeployCommand here was not executed by Railway's config-as-code.
 
 [build]
 builder = "DOCKERFILE"
 
 [deploy]
-# Migrations run before the new version takes traffic. If they fail, the
-# previous version keeps serving.
-preDeployCommand = ["python manage.py migrate --noinput"]
 # The new version is published only when /health/ answers 200 (see config/health.py).
 healthcheckPath = "/health/"
 healthcheckTimeout = 60

@@ -47,7 +47,19 @@ also runs `check --deploy` and fails on missing migrations.
 
 ## Deploy
 
-Railway builds the `Dockerfile`. `railway.toml` runs the migrations before
-each deploy and waits for `/health/` to answer 200. Variables to set on the
-service: `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
-`DATABASE_URL` (from the Railway Postgres), `OPENROUTER_API_KEY`.
+Railway builds the `Dockerfile` and waits for `/health/` to answer 200
+before publishing (`railway.toml`). Variables on the service:
+
+| Variable | Value |
+|---|---|
+| `SECRET_KEY` | long random string |
+| `DEBUG` | `0` |
+| `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` | the service domain |
+| `DATABASE_URL` | reference to the Railway Postgres |
+| `MIGRATE_ON_START` | `1` |
+| `OPENROUTER_API_KEY` | reader key |
+| `STORE_NAME` | name shown in the app |
+
+To create the first admin account without a shell, set
+`DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` and
+`DJANGO_SUPERUSER_PASSWORD`, redeploy, then remove the password variable.
