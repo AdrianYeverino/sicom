@@ -4,14 +4,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from django.core.management import call_command
-from django.test import TestCase
+from django.core.management import CommandError, call_command
+from django.test import TestCase, override_settings
 
 from receiving import reader, services
 from receiving.models import DocumentStatus
 
 from . import factories as f
-from .test_services import content, ok, photo, read_line
+from .test_services import content, failed, ok, photo, read_line
 
 D = Decimal
 
@@ -70,3 +70,30 @@ class MetricsScreenTest(TestCase):
         user.is_staff = True
         user.save()
         self.assertContains(self.client.get("/metrics/"), "Renglones que cuadran")
+
+
+@override_settings(OPENROUTER_API_KEY="test-key", READER_MODEL="main/model", READER_BACKUP_MODEL="backup/model")
+class CheckReaderTest(TestCase):
+    def run_check(self, by_model):
+        def read_page(image, model=None):
+            result = by_model[model]
+            result.usage.model = model
+            return result
+
+        out = io.StringIO()
+        with mock.patch.object(reader, "read_page", side_effect=read_page) as read:
+            try:
+                call_command("check_reader", stdout=out)
+            finally:
+                self.models_called = [c.kwargs["model"] for c in read.call_args_list]
+        return out.getvalue()
+
+    def test_says_which_model_answers_and_which_does_not(self):
+        out = self.run_check({"main/model": failed(reader.NO_ENDPOINT), "backup/model": failed(reader.NOT_A_DOCUMENT)})
+        self.assertEqual(self.models_called, ["main/model", "backup/model"])
+        self.assertIn("FALLA  main/model (principal, main/model): Ningún proveedor disponible", out)
+        self.assertIn("OK     backup/model (reserva, backup/model): responde", out)
+
+    def test_fails_when_no_model_answers(self):
+        with self.assertRaises(CommandError):
+            self.run_check({"main/model": failed(reader.AUTH), "backup/model": failed(reader.AUTH)})

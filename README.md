@@ -77,6 +77,32 @@ supplier is recognized by code without any training.
 The reader's `schema.json` and `prompt.md` are in Spanish because the sheets
 are; the Spanish keys are mapped to English names at the edge.
 
+### Models and failures
+
+Each page is read by the main model (`READER_MODEL`, MiniMax M3). If it cannot
+read the page, the backup model (`READER_BACKUP_MODEL`, Qwen 3.5 Flash) reads
+it, and the screen says so and why. Both were measured on real sheets.
+
+The provider is never fixed. OpenRouter picks any provider that honours the
+strict JSON schema and does not serve the model at fp4, so a provider that
+leaves or joins changes nothing here (`reader.provider_preferences`).
+
+| Failure | Backup used | Retried |
+|---|---|---|
+| `rate_limit`, `provider_down` | yes | once per model |
+| `no_endpoint`, `bad_request`, `unknown`, `timeout`, `schema`, `invalid_json`, `truncated` | yes | no |
+| `auth`, `no_credit` (same key for both models), `not_a_document` (the photo) | no | no |
+
+Every attempt is stored as a `PageReading`, with its model, its provider,
+whether it was the backup, and its cost. What each failure means and what
+to do about it is in `receiving/models.py` (`OUTCOME_HELP`).
+
+To check that both models answer right now (a fraction of a cent):
+
+```powershell
+.venv\Scripts\python manage.py check_reader
+```
+
 ## Run it locally
 
 Requires Docker Desktop and [uv](https://docs.astral.sh/uv/).
@@ -141,9 +167,12 @@ Variables:
 | `OPENROUTER_API_KEY` | reader key |
 | `STORE_NAME` | name shown in the app |
 
-Optional: `READER_MODEL`, `READER_PROVIDER`, `READER_IMAGE_MAX_SIDE`,
+Optional: `READER_MODEL`, `READER_BACKUP_MODEL` (empty: no backup), `READER_IMAGE_MAX_SIDE`,
 `DEFAULT_MARGIN_PERCENT`, `TAX_RATE` and the `THRESHOLD_*` values (see
 `config/settings.py`).
+
+After a deploy, `python manage.py check_reader` in a shell on the service
+confirms that both models answer with the production key.
 
 On a host without a pre-deploy step, set `MIGRATE_ON_START=1`. To create the
 first admin account without a shell, set `DJANGO_SUPERUSER_USERNAME`,

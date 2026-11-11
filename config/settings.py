@@ -193,9 +193,16 @@ OPENROUTER_API_KEY = config("OPENROUTER_API_KEY", default="")
 
 READER_MODEL = config("READER_MODEL", default="minimax/minimax-m3")
 
-# The provider measured in the model comparison. Empty: any provider, and the
-# one used is recorded on each reading.
-READER_PROVIDER = config("READER_PROVIDER", default="together")
+# Read with this model when the main one cannot read a page. Empty: no backup.
+# Both were measured in the model comparison (2026-10-02). The provider is
+# never fixed: OpenRouter picks one that meets the rules in the reader.
+READER_BACKUP_MODEL = config("READER_BACKUP_MODEL", default="qwen/qwen3.5-flash-02-23")
+
+# Names shown on screen for each model; any other shows its OpenRouter name.
+READER_MODEL_NAMES = {
+    "minimax/minimax-m3": "MiniMax M3",
+    "qwen/qwen3.5-flash-02-23": "Qwen 3.5 Flash",
+}
 
 READER_MAX_TOKENS = config("READER_MAX_TOKENS", default=8000, cast=int)
 

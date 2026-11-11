@@ -8,7 +8,7 @@
 <p class="muted">Una foto por página, en orden. La foto se queda en tu teléfono: aquí solo se guarda una miniatura.</p>
 
 <ol class="pages" id="pages" data-upload-url="{% url 'receiving:page_add' document.pk %}">
-  {% for page, last in pages %}{% include "receiving/_page.html" %}{% endfor %}
+  {% for page, last, main_failure in pages %}{% include "receiving/_page.html" %}{% endfor %}
 </ol>
 
 <div class="upload-actions">

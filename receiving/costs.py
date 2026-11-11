@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.conf import settings
 from django.db.models import Count, Q, Sum
 
-from .models import PageReading
+from .models import PageReading, model_name
 
 
 def to_mxn(usd):
@@ -74,3 +74,36 @@ def by_document(document_ids):
 
 def of_document(document):
     return total(PageReading.objects.filter(page__document=document))
+
+
+@dataclass
+class ModelUse:
+    name: str
+    model: str
+    backup_calls: int
+    pages_read: int
+    cost: Cost
+
+
+def by_model():
+    """What each model did: calls, pages it read, cost, and how many of its
+    calls were as the backup. Main model first, then by number of calls."""
+    rows = (
+        PageReading.objects.values("model")
+        .annotate(
+            **AGGREGATES,
+            backup_calls=Count("id", filter=Q(is_backup=True)),
+            pages_read=Count("id", filter=Q(outcome="ok")),
+        )
+    )
+    uses = [
+        ModelUse(
+            name=model_name(row["model"]),
+            model=row["model"],
+            backup_calls=row["backup_calls"],
+            pages_read=row["pages_read"],
+            cost=_cost(row),
+        )
+        for row in rows
+    ]
+    return sorted(uses, key=lambda u: (u.model != settings.READER_MODEL, -u.cost.calls))
