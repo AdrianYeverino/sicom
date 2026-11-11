@@ -81,7 +81,12 @@ are; the Spanish keys are mapped to English names at the edge.
 
 Each page is read by the main model (`READER_MODEL`, MiniMax M3). If it cannot
 read the page, the backup model (`READER_BACKUP_MODEL`, Qwen 3.5 Flash) reads
-it, and the screen says so and why. Both were measured on real sheets.
+it, and the screen says so and why. Both were measured on real sheets: on
+18 pages of 12 documents (2026-11-11) the backup matched the main model in
+quantity, cost and amount on 169 of 170 lines, but it once took the unit (H87) for the
+supplier code, it wrote a subtotal on two first pages that print none (the
+subtotal check flags it), and it reasons before answering, so it gets its own
+token limit and takes about a minute per page.
 
 The provider is never fixed. OpenRouter picks any provider that honours the
 strict JSON schema and does not serve the model at fp4, so a provider that
@@ -167,7 +172,8 @@ Variables:
 | `OPENROUTER_API_KEY` | reader key |
 | `STORE_NAME` | name shown in the app |
 
-Optional: `READER_MODEL`, `READER_BACKUP_MODEL` (empty: no backup), `READER_IMAGE_MAX_SIDE`,
+Optional: `READER_MODEL`, `READER_BACKUP_MODEL` (empty: no backup),
+`READER_MAX_TOKENS`, `READER_BACKUP_MAX_TOKENS`, `READER_IMAGE_MAX_SIDE`,
 `DEFAULT_MARGIN_PERCENT`, `TAX_RATE` and the `THRESHOLD_*` values (see
 `config/settings.py`).
 

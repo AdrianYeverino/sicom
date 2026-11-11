@@ -206,6 +206,10 @@ READER_MODEL_NAMES = {
 
 READER_MAX_TOKENS = config("READER_MAX_TOKENS", default=8000, cast=int)
 
+# The backup reasons before answering (4,000 to 6,000 tokens on real sheets),
+# and with 8,000 it cut 3 of 18 pages. 16,000 read all of them.
+READER_BACKUP_MAX_TOKENS = config("READER_BACKUP_MAX_TOKENS", default=16000, cast=int)
+
 # Long side of the image sent to the model. Every provider gets the same
 # image, and it is the main lever on input tokens.
 READER_IMAGE_MAX_SIDE = config("READER_IMAGE_MAX_SIDE", default=2000, cast=int)

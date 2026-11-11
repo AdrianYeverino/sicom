@@ -275,7 +275,7 @@ def _classify(error):
     return UNKNOWN
 
 
-def read_page(image_jpeg: bytes, model: str | None = None) -> PageResult:
+def read_page(image_jpeg: bytes, model: str | None = None, max_tokens: int | None = None) -> PageResult:
     """Reads one page once. Each call is a new single-message conversation:
     the model never sees another page or an earlier reading."""
     model = model or settings.READER_MODEL
@@ -293,7 +293,7 @@ def read_page(image_jpeg: bytes, model: str | None = None) -> PageResult:
         response = _client().chat.completions.create(
             model=model,
             temperature=0,
-            max_tokens=settings.READER_MAX_TOKENS,
+            max_tokens=max_tokens or settings.READER_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": PROMPT},
                 {

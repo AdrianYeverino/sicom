@@ -89,8 +89,9 @@ def backup_model():
 
 
 def _attempts(page, model_jpeg, image_side, model, retryable, pauses, pause, is_backup=False):
+    max_tokens = settings.READER_BACKUP_MAX_TOKENS if is_backup else None
     for attempt in range(len(pauses) + 1):
-        result = reader.read_page(model_jpeg, model=model)
+        result = reader.read_page(model_jpeg, model=model, max_tokens=max_tokens)
         _record(page, result, image_side, is_backup)
         if result.outcome not in retryable or attempt == len(pauses):
             break

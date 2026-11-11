@@ -221,7 +221,7 @@ class BackupModelTest(TestCase):
         """by_model: {model: [results, in order]}. Returns the models called."""
         calls = []
 
-        def read_page(image, model=None):
+        def read_page(image, model=None, max_tokens=None):
             calls.append(model)
             result = by_model[model].pop(0)
             result.usage.model = model
@@ -272,3 +272,12 @@ class BackupModelTest(TestCase):
     @override_settings(READER_BACKUP_MODEL=MAIN)
     def test_a_backup_equal_to_the_main_model_is_no_backup(self):
         self.assertEqual(services.backup_model(), "")
+
+    @override_settings(READER_BACKUP_MAX_TOKENS=16000)
+    def test_the_backup_gets_its_own_token_limit(self):
+        results = [failed(reader.NO_ENDPOINT), ok(self.content)]
+        with mock.patch.object(reader, "read_page", side_effect=results) as read:
+            services.read_with_retries(self.page, b"jpeg", 2000, pause=lambda s: None)
+        main_call, backup_call = read.call_args_list
+        self.assertEqual((main_call.kwargs["model"], main_call.kwargs["max_tokens"]), (MAIN, None))
+        self.assertEqual((backup_call.kwargs["model"], backup_call.kwargs["max_tokens"]), (BACKUP, 16000))

@@ -46,7 +46,9 @@ class Command(BaseCommand):
         for role, model in models:
             # A saved reading would hide whether the model answers today.
             with override_settings(READER_CACHE_DIR=""):
-                result = reader.read_page(image, model=model)
+                result = reader.read_page(
+                    image, model=model, max_tokens=settings.READER_BACKUP_MAX_TOKENS if role == "reserva" else None
+                )
             usage = result.usage
             name = f"{model_name(model)} ({role}, {model})"
             if result.outcome in REACHABLE:

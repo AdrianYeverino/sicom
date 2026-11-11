@@ -75,7 +75,7 @@ class MetricsScreenTest(TestCase):
 @override_settings(OPENROUTER_API_KEY="test-key", READER_MODEL="main/model", READER_BACKUP_MODEL="backup/model")
 class CheckReaderTest(TestCase):
     def run_check(self, by_model):
-        def read_page(image, model=None):
+        def read_page(image, model=None, max_tokens=None):
             result = by_model[model]
             result.usage.model = model
             return result

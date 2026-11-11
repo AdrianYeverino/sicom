@@ -87,7 +87,7 @@ class ScreensTest(TestCase):
         document = services.start_document(self.user)
         page = content(1, 1, [read_line("AT-1001", "GARDEN HOSE 1/2")])
 
-        def read_page(image, model=None):
+        def read_page(image, model=None, max_tokens=None):
             result = failed(reader.NO_ENDPOINT) if model == "minimax/minimax-m3" else ok(page)
             result.usage.model = model
             return result

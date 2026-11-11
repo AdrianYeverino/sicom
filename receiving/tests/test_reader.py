@@ -198,3 +198,17 @@ class OlderReadingsTest(SimpleTestCase):
         content = reader.to_content(v2)
         self.assertIsNone(content.lines[0].discount_percent)
         self.assertEqual(content.lines[0].unit_cost, Decimal("40.5"))
+
+
+@override_settings(OPENROUTER_API_KEY="test-key", READER_CACHE_DIR="", READER_MAX_TOKENS=8000)
+class TokenLimitTest(SimpleTestCase):
+    def sent_limit(self, **kwargs):
+        client = mock.Mock()
+        client.chat.completions.create.return_value = response(json.dumps(PAGE))
+        with mock.patch.object(reader.openai, "OpenAI", return_value=client):
+            reader.read_page(b"jpeg bytes", **kwargs)
+        return client.chat.completions.create.call_args.kwargs["max_tokens"]
+
+    def test_uses_the_setting_unless_given_one(self):
+        self.assertEqual(self.sent_limit(), 8000)
+        self.assertEqual(self.sent_limit(max_tokens=16000), 16000)
