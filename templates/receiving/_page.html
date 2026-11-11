@@ -7,8 +7,23 @@
     <span class="muted small">{{ page.original_filename|default:"foto" }}</span>
     {% if page.read_status == 'read' %}
       <span class="ok-text">✓ Leída{% if last.raw.renglones %} · {{ last.raw.renglones|length }} renglones{% endif %}</span>
+      {% if last.is_backup %}
+      <p class="reading-note" role="status">
+        <strong>⚠ Leída con el modelo de reserva ({{ last.model_name }}).</strong>
+        {% if main_failure %}{{ main_failure.model_name }} no pudo leerla: {{ main_failure.get_outcome_display|lower }}.{% endif %}
+        Revisa con más cuidado el subtotal y las descripciones.
+      </p>
+      {% endif %}
     {% elif page.read_status == 'failed' %}
-      <span class="bad-text">✗ {{ last.get_outcome_display|default:"No se pudo leer" }}</span>
+      <span class="bad-text">✗ {{ last.get_outcome_display|default:"No se pudo leer" }}{% if last.is_backup %} (también con el modelo de reserva){% endif %}</span>
+      {% if last.help_text %}<span class="small">{{ last.help_text }}</span>{% endif %}
+      {% if main_failure or last.error_detail %}
+      <details class="small">
+        <summary>Detalle técnico</summary>
+        {% if main_failure %}<p>{{ main_failure.model_name }}: {{ main_failure.get_outcome_display }}. {{ main_failure.error_detail }}</p>{% endif %}
+        {% if last.error_detail %}<p>{{ last.model_name }}: {{ last.error_detail }}</p>{% endif %}
+      </details>
+      {% endif %}
       <label class="btn btn-small">
         <input type="file" accept="image/*,.heic,.heif" hidden data-replace="{% url 'receiving:page_replace' page.pk %}">
         Volver a subir esta foto

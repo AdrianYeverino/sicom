@@ -41,14 +41,26 @@ AUTH = "auth"
 NO_CREDIT = "no_credit"
 RATE_LIMIT = "rate_limit"
 PROVIDER_DOWN = "provider_down"
+NO_ENDPOINT = "no_endpoint"
+BAD_REQUEST = "bad_request"
+UNKNOWN = "unknown"
 TIMEOUT = "timeout"
 TRUNCATED = "truncated"
 INVALID_JSON = "invalid_json"
 SCHEMA_ERROR = "schema"
 NOT_A_DOCUMENT = "not_a_document"
 
-# Worth trying again after a pause; the others will fail the same way.
-RETRYABLE = {RATE_LIMIT, PROVIDER_DOWN, TIMEOUT}
+# Worth trying again with the same model after a pause.
+RETRYABLE = {RATE_LIMIT, PROVIDER_DOWN}
+
+# Not worth trying with the backup model: the key is the same for both
+# models, and a photo that is not a sheet is not the model's fault.
+NO_BACKUP = {OK, AUTH, NO_CREDIT, NOT_A_DOCUMENT}
+
+# Provider rules sent to OpenRouter instead of a provider's name, so a
+# provider that leaves or joins changes nothing here. fp4 is left out: an
+# fp4 endpoint misread 3 of 10 codes with full confidence (2026-10-07).
+QUANTIZATIONS = ["fp8", "fp16", "bf16", "fp32", "unknown"]
 
 
 @dataclass
@@ -216,11 +228,10 @@ def _client():
     )
 
 
-def _provider_preferences():
-    preferences = {"require_parameters": True}
-    if settings.READER_PROVIDER:
-        preferences.update(order=[settings.READER_PROVIDER], allow_fallbacks=False)
-    return preferences
+def provider_preferences():
+    """Any provider that honours every parameter sent (the strict schema
+    above all) and does not serve the model at fp4."""
+    return {"require_parameters": True, "quantizations": QUANTIZATIONS, "allow_fallbacks": True}
 
 
 def _usage_from(response, model, seconds):
@@ -249,15 +260,22 @@ def _classify(error):
     if isinstance(error, openai.RateLimitError):
         return RATE_LIMIT
     if isinstance(error, openai.APIStatusError):
-        if error.status_code == 402:
+        status = error.status_code
+        if status == 402:
             return NO_CREDIT
-        if error.status_code >= 500 or error.status_code in (404, 408):
-            # 404: no provider currently serves this model with these settings.
+        if status == 404:
+            # No provider serves this model with these rules right now.
+            return NO_ENDPOINT
+        if status == 408:
+            return TIMEOUT
+        if status in (400, 422):
+            return BAD_REQUEST
+        if status >= 500:
             return PROVIDER_DOWN
-    return PROVIDER_DOWN
+    return UNKNOWN
 
 
-def read_page(image_jpeg: bytes, model: str | None = None) -> PageResult:
+def read_page(image_jpeg: bytes, model: str | None = None, max_tokens: int | None = None) -> PageResult:
     """Reads one page once. Each call is a new single-message conversation:
     the model never sees another page or an earlier reading."""
     model = model or settings.READER_MODEL
@@ -275,7 +293,7 @@ def read_page(image_jpeg: bytes, model: str | None = None) -> PageResult:
         response = _client().chat.completions.create(
             model=model,
             temperature=0,
-            max_tokens=settings.READER_MAX_TOKENS,
+            max_tokens=max_tokens or settings.READER_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": PROMPT},
                 {
@@ -293,7 +311,7 @@ def read_page(image_jpeg: bytes, model: str | None = None) -> PageResult:
             extra_body={
                 # Each answer reports its tokens and the real cost in USD.
                 "usage": {"include": True},
-                "provider": _provider_preferences(),
+                "provider": provider_preferences(),
             },
         )
     except openai.OpenAIError as error:

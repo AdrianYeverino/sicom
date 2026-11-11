@@ -83,13 +83,15 @@ def upload(request, pk):
     document = get_object_or_404(ReceivedDocument, pk=pk)
     if document.status != DocumentStatus.READING:
         return redirect("receiving:review", pk)
-    pages = [(page, page.readings.order_by("-created_at").first()) for page in document.pages.all()]
+    pages = [(page, *services.reading_state(page)) for page in document.pages.all()]
     return render(request, "receiving/upload.html", {"document": document, "pages": pages})
 
 
 def _page_fragment(request, page, error=""):
-    last = page.readings.order_by("-created_at").first()
-    return render(request, "receiving/_page.html", {"page": page, "last": last, "error": error})
+    last, main_failure = services.reading_state(page)
+    return render(
+        request, "receiving/_page.html", {"page": page, "last": last, "main_failure": main_failure, "error": error}
+    )
 
 
 @require_POST
@@ -210,7 +212,8 @@ def review(request, pk):
             if c["line"].product is None and c["suggestion"] is None and c["line"].reason == "unrecognized_product"
         ),
         "pages": document.pages.all(),
-        "warnings": [DocumentWarning(w).label for w in document.warnings if w in DocumentWarning.values],
+        "warnings": [DocumentWarning(w).label for w in document.warnings if w in DocumentWarning.values]
+        + services.backup_warnings(document),
         "amounts": sum((line.amount for line in lines), Decimal("0")),
         "suppliers": Supplier.objects.filter(active=True),
         "entry": ConfirmedEntry.objects.filter(document=document).first(),
@@ -448,6 +451,7 @@ def metrics(request):
     return render(request, "receiving/metrics.html", {
         "m": measurements.measure(),
         "cost": costs.total(),
+        "models": costs.by_model(),
         "documents": [(d, per_document.get(d.pk, costs.Cost())) for d in documents],
         "rate": settings.USD_MXN_RATE,
     })

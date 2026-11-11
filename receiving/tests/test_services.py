@@ -4,7 +4,7 @@ import io
 from decimal import Decimal
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from PIL import Image
 
 from catalog.models import CostSource, Product, ProductSupplierCode, Supplier
@@ -73,6 +73,7 @@ def failed(outcome):
     return reader.PageResult(outcome, reader.Usage(model="m"), error_detail="x")
 
 
+@override_settings(READER_BACKUP_MODEL="")
 class FlowTest(TestCase):
     def setUp(self):
         self.user = f.user("ana")
@@ -201,3 +202,82 @@ class FlowTest(TestCase):
             services.set_price(hose, self.user, margin_percent=D("10"))
         with self.assertRaises(services.ReceivingError):
             services.confirm(document, self.user)
+
+
+MAIN, BACKUP = "main/model", "backup/model"
+
+
+@override_settings(READER_MODEL=MAIN, READER_BACKUP_MODEL=BACKUP)
+class BackupModelTest(TestCase):
+    """When the main model cannot read a page, the backup reads it, and the
+    person is told which model read it and why."""
+
+    def setUp(self):
+        self.user = f.user("ana")
+        self.page = f.page(services.start_document(self.user))
+        self.content = content(1, 1, [read_line("AT-1001", "GARDEN HOSE 1/2")])
+
+    def read(self, by_model):
+        """by_model: {model: [results, in order]}. Returns the models called."""
+        calls = []
+
+        def read_page(image, model=None, max_tokens=None):
+            calls.append(model)
+            result = by_model[model].pop(0)
+            result.usage.model = model
+            return result
+
+        with mock.patch.object(reader, "read_page", side_effect=read_page):
+            services.read_with_retries(self.page, b"jpeg", 2000, pause=lambda s: None)
+        return calls
+
+    def test_no_provider_for_the_main_model_goes_straight_to_the_backup(self):
+        calls = self.read({MAIN: [failed(reader.NO_ENDPOINT)], BACKUP: [ok(self.content)]})
+        self.assertEqual(calls, [MAIN, BACKUP])
+        self.assertEqual(self.page.read_status, ReadStatus.READ)
+        main, backup = PageReading.objects.filter(page=self.page).order_by("created_at")
+        self.assertEqual((main.is_backup, backup.is_backup), (False, True))
+        last, main_failure = services.reading_state(self.page)
+        self.assertEqual((last, main_failure), (backup, main))
+
+    def test_the_main_model_gets_one_retry_first(self):
+        calls = self.read({MAIN: [failed(reader.PROVIDER_DOWN), failed(reader.PROVIDER_DOWN)], BACKUP: [ok(self.content)]})
+        self.assertEqual(calls, [MAIN, MAIN, BACKUP])
+
+    def test_the_main_model_reading_it_never_calls_the_backup(self):
+        self.assertEqual(self.read({MAIN: [ok(self.content)], BACKUP: []}), [MAIN])
+        self.assertEqual(services.reading_state(self.page)[1], None)
+
+    def test_failures_the_backup_would_repeat_stay(self):
+        for outcome in (reader.AUTH, reader.NO_CREDIT, reader.NOT_A_DOCUMENT):
+            with self.subTest(outcome=outcome):
+                self.assertEqual(self.read({MAIN: [failed(outcome)], BACKUP: []}), [MAIN])
+                self.assertEqual(self.page.read_status, ReadStatus.FAILED)
+
+    def test_both_failing_leaves_the_page_failed_with_every_attempt(self):
+        calls = self.read({
+            MAIN: [failed(reader.TIMEOUT)],
+            BACKUP: [failed(reader.RATE_LIMIT), failed(reader.RATE_LIMIT)],
+        })
+        self.assertEqual(calls, [MAIN, BACKUP, BACKUP])
+        self.assertEqual(self.page.read_status, ReadStatus.FAILED)
+        self.assertEqual(PageReading.objects.filter(page=self.page, is_backup=True).count(), 2)
+
+    def test_the_review_warns_which_pages_the_backup_read(self):
+        self.read({MAIN: [failed(reader.NO_ENDPOINT)], BACKUP: [ok(self.content)]})
+        warnings = services.backup_warnings(self.page.document)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("La página 1 se leyó con el modelo de reserva", warnings[0])
+
+    @override_settings(READER_BACKUP_MODEL=MAIN)
+    def test_a_backup_equal_to_the_main_model_is_no_backup(self):
+        self.assertEqual(services.backup_model(), "")
+
+    @override_settings(READER_BACKUP_MAX_TOKENS=16000)
+    def test_the_backup_gets_its_own_token_limit(self):
+        results = [failed(reader.NO_ENDPOINT), ok(self.content)]
+        with mock.patch.object(reader, "read_page", side_effect=results) as read:
+            services.read_with_retries(self.page, b"jpeg", 2000, pause=lambda s: None)
+        main_call, backup_call = read.call_args_list
+        self.assertEqual((main_call.kwargs["model"], main_call.kwargs["max_tokens"]), (MAIN, None))
+        self.assertEqual((backup_call.kwargs["model"], backup_call.kwargs["max_tokens"]), (BACKUP, 16000))

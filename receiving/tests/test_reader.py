@@ -67,7 +67,7 @@ def status_error(cls, status):
     return cls("failed", response=httpx2.Response(status, request=request), body=None)
 
 
-@override_settings(OPENROUTER_API_KEY="test-key", READER_CACHE_DIR="", READER_PROVIDER="provider-x")
+@override_settings(OPENROUTER_API_KEY="test-key", READER_CACHE_DIR="")
 class ReadPageTest(SimpleTestCase):
     def read(self, content=None, error=None, finish_reason="stop"):
         client = mock.Mock()
@@ -97,10 +97,26 @@ class ReadPageTest(SimpleTestCase):
         self.assertEqual(result.usage.provider, "provider-x")
         self.assertEqual(result.prompt_version, reader.PROMPT_VERSION)
 
-    def test_asks_for_the_measured_provider_only(self):
+    def test_asks_for_rules_not_for_a_provider(self):
         self.read(json.dumps(PAGE))
         sent = self.client_mock.chat.completions.create.call_args.kwargs["extra_body"]["provider"]
-        self.assertEqual(sent, {"require_parameters": True, "order": ["provider-x"], "allow_fallbacks": False})
+        self.assertTrue(sent["require_parameters"])
+        self.assertTrue(sent["allow_fallbacks"])
+        self.assertNotIn("order", sent)
+        self.assertNotIn("fp4", sent["quantizations"])
+
+    def test_reads_with_the_model_it_is_given(self):
+        result = self.read_with_model("some/backup-model")
+        self.assertEqual(self.client_mock.chat.completions.create.call_args.kwargs["model"], "some/backup-model")
+        self.assertEqual(result.usage.model, "some/backup-model")
+
+    def read_with_model(self, model):
+        client = mock.Mock()
+        client.chat.completions.create.return_value = response(json.dumps(PAGE))
+        with mock.patch.object(reader.openai, "OpenAI", return_value=client):
+            result = reader.read_page(b"jpeg bytes", model=model)
+        self.client_mock = client
+        return result
 
     def test_strips_json_fences(self):
         self.assertTrue(self.read("```json\n" + json.dumps(PAGE) + "\n```").ok)
@@ -129,6 +145,12 @@ class ReadPageTest(SimpleTestCase):
             (status_error(openai.APIStatusError, 402), reader.NO_CREDIT),
             (status_error(openai.RateLimitError, 429), reader.RATE_LIMIT),
             (status_error(openai.InternalServerError, 503), reader.PROVIDER_DOWN),
+            (openai.APIConnectionError(request=request), reader.PROVIDER_DOWN),
+            (status_error(openai.NotFoundError, 404), reader.NO_ENDPOINT),
+            (status_error(openai.BadRequestError, 400), reader.BAD_REQUEST),
+            (status_error(openai.UnprocessableEntityError, 422), reader.BAD_REQUEST),
+            (status_error(openai.APIStatusError, 408), reader.TIMEOUT),
+            (status_error(openai.APIStatusError, 418), reader.UNKNOWN),
             (openai.APITimeoutError(request=request), reader.TIMEOUT),
         ]
         for error, outcome in cases:
@@ -140,7 +162,7 @@ class ReadPageTest(SimpleTestCase):
         self.assertEqual(reader.read_page(b"jpeg bytes").outcome, reader.AUTH)
 
 
-@override_settings(OPENROUTER_API_KEY="test-key", READER_PROVIDER="")
+@override_settings(OPENROUTER_API_KEY="test-key")
 class SavedReadingTest(SimpleTestCase):
     def test_a_page_is_paid_for_once(self):
         with tempfile.TemporaryDirectory() as folder, override_settings(READER_CACHE_DIR=folder):
@@ -176,3 +198,17 @@ class OlderReadingsTest(SimpleTestCase):
         content = reader.to_content(v2)
         self.assertIsNone(content.lines[0].discount_percent)
         self.assertEqual(content.lines[0].unit_cost, Decimal("40.5"))
+
+
+@override_settings(OPENROUTER_API_KEY="test-key", READER_CACHE_DIR="", READER_MAX_TOKENS=8000)
+class TokenLimitTest(SimpleTestCase):
+    def sent_limit(self, **kwargs):
+        client = mock.Mock()
+        client.chat.completions.create.return_value = response(json.dumps(PAGE))
+        with mock.patch.object(reader.openai, "OpenAI", return_value=client):
+            reader.read_page(b"jpeg bytes", **kwargs)
+        return client.chat.completions.create.call_args.kwargs["max_tokens"]
+
+    def test_uses_the_setting_unless_given_one(self):
+        self.assertEqual(self.sent_limit(), 8000)
+        self.assertEqual(self.sent_limit(max_tokens=16000), 16000)

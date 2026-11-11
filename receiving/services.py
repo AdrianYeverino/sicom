@@ -5,6 +5,7 @@ Flow: start_document → add_page (one call per photo: prepare, read) →
 finish_reading (merge, recognize, verify) → review operations → confirm.
 """
 
+import logging
 import time
 from decimal import Decimal
 
@@ -35,6 +36,8 @@ from .verification import adds_up, check_document, check_line, merge
 
 RETRY_PAUSES = (2, 5)  # seconds before the second and third attempt
 
+logger = logging.getLogger(__name__)
+
 
 class ReceivingError(Exception):
     """A rule the person can fix. The message is for them."""
@@ -60,12 +63,13 @@ def thresholds_of(document):
     return values
 
 
-def _record(page, result, image_side):
+def _record(page, result, image_side, is_backup=False):
     return PageReading.objects.create(
         page=page,
         outcome=result.outcome,
         error_detail=result.error_detail,
         model=result.usage.model,
+        is_backup=is_backup,
         provider=result.usage.provider or "",
         prompt_version=result.prompt_version,
         image_side=image_side,
@@ -78,15 +82,52 @@ def _record(page, result, image_side):
     )
 
 
+def backup_model():
+    """The backup model, or "" when there is none (or it is the main one)."""
+    backup = settings.READER_BACKUP_MODEL
+    return backup if backup and backup != settings.READER_MODEL else ""
+
+
+def _attempts(page, model_jpeg, image_side, model, retryable, pauses, pause, is_backup=False):
+    max_tokens = settings.READER_BACKUP_MAX_TOKENS if is_backup else None
+    for attempt in range(len(pauses) + 1):
+        result = reader.read_page(model_jpeg, model=model, max_tokens=max_tokens)
+        _record(page, result, image_side, is_backup)
+        if result.outcome not in retryable or attempt == len(pauses):
+            break
+        pause(pauses[attempt])
+    return result
+
+
+def reading_state(page):
+    """The page's last reading and, when the backup made it, the main
+    model's last attempt before it: the reason the backup was used."""
+    readings = list(page.readings.order_by("-created_at"))
+    last = readings[0] if readings else None
+    main_failure = None
+    if last and last.is_backup:
+        main_failure = next((r for r in readings if not r.is_backup), None)
+    return last, main_failure
+
+
 def read_with_retries(page, model_jpeg, image_side, pause=time.sleep):
     """Reads one page, retrying only what can succeed on a second try.
-    Every attempt is recorded: each one may have been paid for."""
-    for attempt in range(len(RETRY_PAUSES) + 1):
-        result = reader.read_page(model_jpeg)
-        _record(page, result, image_side)
-        if result.outcome not in reader.RETRYABLE or attempt == len(RETRY_PAUSES):
-            break
-        pause(RETRY_PAUSES[attempt])
+    Every attempt is recorded: each one may have been paid for.
+
+    With a backup model, the main one gets one retry, and what it could not
+    read goes to the backup, which also gets one retry. Failures the backup
+    would repeat (the key, the credit, a photo that is not a sheet) stay."""
+    main, backup = settings.READER_MODEL, backup_model()
+    if not backup:
+        retryable = reader.RETRYABLE | {reader.TIMEOUT}
+        result = _attempts(page, model_jpeg, image_side, main, retryable, RETRY_PAUSES, pause)
+    else:
+        result = _attempts(page, model_jpeg, image_side, main, reader.RETRYABLE, RETRY_PAUSES[:1], pause)
+        if result.outcome not in reader.NO_BACKUP:
+            logger.warning("reader: %s did not read page %s (%s); trying %s", main, page.pk, result.outcome, backup)
+            result = _attempts(
+                page, model_jpeg, image_side, backup, reader.RETRYABLE, RETRY_PAUSES[:1], pause, is_backup=True
+            )
     page.read_status = ReadStatus.READ if result.ok else ReadStatus.FAILED
     page.save(update_fields=["read_status", "updated_at"])
     return result
@@ -139,6 +180,21 @@ def replace_page(page, user, data, filename="", device=""):
 
 def latest_reading(page):
     return page.readings.filter(outcome=ReadingOutcome.OK).order_by("-created_at").first()
+
+
+def backup_warnings(document):
+    """One warning per backup model that read any page of the document."""
+    by_model = {}
+    for page in document.pages.order_by("upload_order"):
+        reading = latest_reading(page)
+        if reading and reading.is_backup:
+            by_model.setdefault(reading.model_name, []).append(str(page.upload_order))
+    return [
+        f"{'La página' if len(pages) == 1 else 'Las páginas'} {', '.join(pages)} "
+        f"{'se leyó' if len(pages) == 1 else 'se leyeron'} con el modelo de reserva ({name}), "
+        "porque el principal no pudo. Revisa con más cuidado el subtotal y las descripciones."
+        for name, pages in by_model.items()
+    ]
 
 
 def finish_reading(document, user):

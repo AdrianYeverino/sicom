@@ -128,11 +128,39 @@ class ReadingOutcome(models.TextChoices):
     NO_CREDIT = "no_credit", "Sin crédito"
     RATE_LIMIT = "rate_limit", "Demasiadas peticiones"
     PROVIDER_DOWN = "provider_down", "Servicio caído"
+    NO_ENDPOINT = "no_endpoint", "Ningún proveedor disponible"
+    BAD_REQUEST = "bad_request", "Petición rechazada"
+    UNKNOWN = "unknown", "Error desconocido"
     TIMEOUT = "timeout", "Tiempo agotado"
     TRUNCATED = "truncated", "Respuesta cortada"
     INVALID_JSON = "invalid_json", "Respuesta ilegible"
     SCHEMA = "schema", "Respuesta fuera del formato"
     NOT_A_DOCUMENT = "not_a_document", "No es una hoja de proveedor"
+
+
+# What happened and what the person can do about it, for each failed outcome.
+OUTCOME_HELP = {
+    ReadingOutcome.AUTH: "La llave de OpenRouter no es válida o se revocó. Avisa al administrador.",
+    ReadingOutcome.NO_CREDIT: "Se acabó el crédito de OpenRouter. Avisa al administrador para que lo recargue.",
+    ReadingOutcome.RATE_LIMIT: "Se mandaron muchas fotos seguidas. Espera un minuto y vuelve a subir esta foto.",
+    ReadingOutcome.PROVIDER_DOWN: "El servicio que lee la hoja no respondió. Espera unos minutos y vuelve a subir la foto.",
+    ReadingOutcome.NO_ENDPOINT: (
+        "Ningún proveedor ofrece ahora el modelo con lo que pide la app. Avisa al administrador: "
+        "con python manage.py check_reader se ve qué modelo falla."
+    ),
+    ReadingOutcome.BAD_REQUEST: "OpenRouter rechazó la petición. Es un error de la app: avisa al administrador.",
+    ReadingOutcome.UNKNOWN: "Pasó algo que la app no reconoce. Avisa al administrador: el detalle quedó guardado.",
+    ReadingOutcome.TIMEOUT: "El modelo tardó demasiado en contestar. Vuelve a subir la foto.",
+    ReadingOutcome.TRUNCATED: "La respuesta del modelo se cortó. Vuelve a subir la foto; si pasa otra vez, avisa al administrador.",
+    ReadingOutcome.INVALID_JSON: "El modelo contestó algo que no se pudo leer. Vuelve a subir la foto.",
+    ReadingOutcome.SCHEMA: "El modelo contestó con un formato distinto al pedido. Vuelve a subir la foto.",
+    ReadingOutcome.NOT_A_DOCUMENT: "La foto no parece una hoja de proveedor. Revisa que se vea completa y con buena luz.",
+}
+
+
+def model_name(model):
+    """The name shown on screen for an OpenRouter model id."""
+    return settings.READER_MODEL_NAMES.get(model, model)
 
 
 class PageReading(BaseModel):
@@ -143,6 +171,7 @@ class PageReading(BaseModel):
     outcome = models.CharField("resultado", max_length=14, choices=ReadingOutcome)
     error_detail = models.CharField("detalle", max_length=500, blank=True)
     model = models.CharField("modelo", max_length=100)
+    is_backup = models.BooleanField("modelo de reserva", default=False)
     provider = models.CharField("proveedor del modelo", max_length=60, blank=True)
     prompt_version = models.CharField("versión del prompt", max_length=20)
     image_side = models.PositiveSmallIntegerField("lado enviado (px)")
@@ -167,6 +196,14 @@ class PageReading(BaseModel):
 
     def __str__(self):
         return f"{self.page} · {self.outcome}"
+
+    @property
+    def model_name(self):
+        return model_name(self.model)
+
+    @property
+    def help_text(self):
+        return OUTCOME_HELP.get(self.outcome, "")
 
 
 class LineStatus(models.TextChoices):

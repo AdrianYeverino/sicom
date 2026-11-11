@@ -4,7 +4,7 @@ import io
 from decimal import Decimal
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
@@ -12,7 +12,7 @@ from receiving import reader, services
 from receiving.models import DocumentStatus, LineStatus
 
 from . import factories as f
-from .test_services import content, ok, read_line
+from .test_services import content, failed, ok, read_line
 
 D = Decimal
 
@@ -81,6 +81,34 @@ class ScreensTest(TestCase):
         body = csv.content.decode("utf-8-sig")
         self.assertIn("Garden hose 1/2", body)
         self.assertIn("70.47", body)
+
+    @override_settings(READER_MODEL="minimax/minimax-m3", READER_BACKUP_MODEL="qwen/qwen3.5-flash-02-23")
+    def test_a_page_read_by_the_backup_says_so_and_why(self):
+        document = services.start_document(self.user)
+        page = content(1, 1, [read_line("AT-1001", "GARDEN HOSE 1/2")])
+
+        def read_page(image, model=None, max_tokens=None):
+            result = failed(reader.NO_ENDPOINT) if model == "minimax/minimax-m3" else ok(page)
+            result.usage.model = model
+            return result
+
+        with mock.patch.object(reader, "read_page", side_effect=read_page):
+            response = self.client.post(reverse("receiving:page_add", args=[document.pk]), {"photo": photo()})
+        self.assertContains(response, "Leída con el modelo de reserva (Qwen 3.5 Flash)")
+        self.assertContains(response, "MiniMax M3 no pudo leerla: ningún proveedor disponible")
+
+        self.client.post(reverse("receiving:finish", args=[document.pk]))
+        review = self.client.get(reverse("receiving:review", args=[document.pk]))
+        self.assertContains(review, "se leyó con el modelo de reserva (Qwen 3.5 Flash)")
+
+    @override_settings(READER_BACKUP_MODEL="")
+    def test_a_failed_page_says_what_to_do(self):
+        document = services.start_document(self.user)
+        with mock.patch.object(reader, "read_page", return_value=failed(reader.NO_CREDIT)):
+            response = self.client.post(reverse("receiving:page_add", args=[document.pk]), {"photo": photo()})
+        self.assertContains(response, "Sin crédito")
+        self.assertContains(response, "Avisa al administrador para que lo recargue")
+        self.assertContains(response, "Detalle técnico")
 
     def test_a_photo_that_cannot_be_opened_answers_with_the_reason(self):
         document = services.start_document(self.user)
